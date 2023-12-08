@@ -57,3 +57,5 @@ Open Source ya'ni kodlarni ochib qo'yish ko'pchilik uchun ahmoqlikdek tuyuladi. 
 4. Loyihangiz global bozorga chiqishi mumkin.
 
 Hoziroq Githubdan o'zingizga qiziq bo'lgan loyihani topishingiz mumkin: https://github.com/explore
+
+Obuna bo'ling: https://t.me/sayfulla_log
