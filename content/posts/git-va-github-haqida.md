@@ -1,14 +1,7 @@
----
-author:
-  name: "Sayfulla Mirxalikov"
-date: 2023-12-07
-linktitle: Test
-title: Git va GitHub haqida
-type:
-- post
-- posts
-weight: 10
----
++++
+title = "Git va GitHub haqida"
+date = "2023-12-07"
++++
 
 ![Git image](/images/git-github.jpg)
 
