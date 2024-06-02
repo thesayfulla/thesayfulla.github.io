@@ -3,7 +3,7 @@ title = "Sqlite arxitekturasi/qanday ishlashi"
 date = "2024-06-02"
 +++
 
-Sqlite bu yagona file'da ma'lumotlarni saqlay oluvchi minimal [RDBMS](https://en.wikipedia.org/wiki/Relational_database) va u SQL text'larni bytecode'larda "virtual machine" yaratish orqali saqlaydi.
+Sqlite bu yagona file’da ma’lumotlarni saqlay oluvchi mini [RDBMS](https://en.wikipedia.org/wiki/Relational_database) va u "SQL text"larni "bytecode"larga o'girib oladi va “virtual machine”da "bytecode"ni ishga tushirish orqali ishlaydi.
 
 Ushbu rasmda sqlite'ni qanday ishlashi haqida qisqacha tushuncha olishingiz mumkin:
 ![Sqlite image](/images/sqlite.png)
