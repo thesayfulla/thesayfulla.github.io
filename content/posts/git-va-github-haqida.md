@@ -51,4 +51,4 @@ Open Source ya'ni kodlarni ochib qo'yish ko'pchilik uchun ahmoqlikdek tuyuladi. 
 
 Hoziroq Githubdan o'zingizga qiziq bo'lgan loyihani topishingiz mumkin: https://github.com/explore
 
-Obuna bo'ling: https://t.me/sayfulla_log
+Obuna bo'ling: https://t.me/sayfulla_blog
