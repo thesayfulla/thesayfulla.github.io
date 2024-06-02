@@ -61,6 +61,9 @@ Operatsion tizim darajasidagi amallarga javob beradi, resurslarni boshqaruvchi q
 Kichik vazifalarni bajaradigan barcha funksiyalar, kengaytmalar shu yerda bo'ladi.
 
 # Test Code
-Oz nomi bilan testlarni qamrab oladi bunda biz yozgan code to'g'ri ishlayotgani, to'g'ri amallarni bajarayotganini yoki yo'qligini bilishga yordam beradi.
+O'z nomi bilan testlarni qamrab oladi bunda biz yozgan code to'g'ri ishlayotgani, to'g'ri amallarni bajarayotganini yoki yo'qligini bilishga yordam beradi.
+
+
+Sqlite hozirda open source va uni code'larini bu yerda ko'rishingiz mumkin: https://sqlite.org/src/tree?name=src
 
 Obuna bo'ling: https://t.me/sayfulla_blog
