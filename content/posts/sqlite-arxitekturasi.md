@@ -66,4 +66,3 @@ O'z nomi bilan testlarni qamrab oladi bunda biz yozgan code to'g'ri ishlayotgani
 
 Sqlite hozirda open source va uni code'larini bu yerda ko'rishingiz mumkin: https://sqlite.org/src/tree?name=src
 
-Obuna bo'ling: https://t.me/sayfulla_blog
