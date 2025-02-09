@@ -1,20 +1,18 @@
 baseURL = "https://thesayfulla.github.io/"
-title   = "Sayfulla's Blog"
+title = "Sayfulla's blog"
 languageCode = "en-us"
-theme = "hugo-theme-console"
+theme = "paper"
+paginate = 10
 
 [params]
-  # Cutting off the page title to two chars for mobile (console-demo -> co)
   titleCutting = true
+  color = 'light'
+  github = 'thesayfulla'
 
-  # Set the animation style -- https://animate.style/
-  # To disable animations, please remove or comment animationStyle parameter
-  animateStyle = "animated zoomIn fast" 
 
-  [[params.navlinks]]
-  name = "about/"
-  url = "about/"
-
-  [[params.navlinks]]
-  name = "posts/"
-  url = "posts/"
+[menu]
+  [[menu.main]]
+    identifier = "about"
+    name = "About"
+    url = "/about/"
+    weight = 10
