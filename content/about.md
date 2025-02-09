@@ -6,7 +6,7 @@ date = "2025-02-09"
 Hello. My name is Sayfulla. I'm backend developer from Uzbekistan. I love contributing open-source projects and solving algorithm problems in [Leetcode](https://leetcode.com/thesayfulla/).
 
 ### My skills:
-* Python(Django, DRF), Go & Rust.
+* Python & Go.
 * PostgreSQL.
 * Docker, docker-compose.
 
