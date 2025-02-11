@@ -1,5 +1,5 @@
 +++
-title = "Sqlite arxitekturasi/qanday ishlashi"
+title = "Sqlite arxitekturasi"
 date = "2024-06-02"
 +++
 
