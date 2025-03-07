@@ -16,3 +16,13 @@ paginate = 10
     name = "About"
     url = "/about/"
     weight = 10
+
+
+[params.giscus]
+  repo = 'thesayfulla/thesayfulla.github.io'                 # see https://giscus.app for more details
+  repoId = 'R_kgDOKfhCgg'
+  category = 'Q&A'
+  categoryId = 'DIC_kwDOKfhCgs4Cnrk1'
+  mapping = 'pathname'
+  theme = 'light'
+  lang = 'en'
