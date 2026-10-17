@@ -7,6 +7,7 @@ special pieces: code blocks (highlighted with Pygments) and embeds
 
 import html
 import re
+from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlparse
 
 import nh3
@@ -118,5 +119,49 @@ def render_article(raw_html):
     return EMPTY_TAIL_RE.sub("", clean)
 
 
-def plain_text(rendered_html):
-    return re.sub(r"\s+", " ", nh3.clean(rendered_html, tags=set())).strip()
+PROSE_TAGS = {"p", "h3", "h4", "blockquote", "li"}
+SKIP_TAGS = {"div", "figure", "pre"}  # code blocks, embeds, images + captions
+VOID_TAGS = {"br", "img", "hr", "input"}
+
+
+class _TextSplitter(HTMLParser):
+    """Separates an article's readable prose from the code inside it."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.stack = []
+        self.prose, self.code = [], []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in VOID_TAGS:
+            return
+        skip = tag in SKIP_TAGS or (tag == "p" and "embed-link" in (dict(attrs).get("class") or ""))
+        self.stack.append((tag, skip))
+
+    def handle_endtag(self, tag):
+        # Pop back to the matching open tag (tolerates sloppy nesting).
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i][0] == tag:
+                del self.stack[i:]
+                break
+
+    def handle_data(self, data):
+        tags = [t for t, _ in self.stack]
+        if "pre" in tags:
+            self.code.append(data)
+        elif not any(skip for _, skip in self.stack) and PROSE_TAGS.intersection(tags):
+            self.prose.append(data)
+
+
+def split_text(rendered_html):
+    """(prose, code) plain text of a rendered article."""
+    parser = _TextSplitter()
+    parser.feed(rendered_html)
+    parser.close()
+    squash = lambda parts: re.sub(r"\s+", " ", " ".join(parts)).strip()
+    return squash(parser.prose), squash(parser.code)
+
+
+def prose_text(rendered_html):
+    """Readable text only — no code, image captions or embed links."""
+    return split_text(rendered_html)[0]

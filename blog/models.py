@@ -3,7 +3,7 @@ import math
 from django.db import models
 from django.urls import reverse
 
-from .rendering import plain_text
+from .rendering import prose_text, split_text
 
 
 class Post(models.Model):
@@ -27,11 +27,14 @@ class Post(models.Model):
 
     @property
     def reading_minutes(self):
-        return max(1, math.ceil(len(plain_text(self.body_html).split()) / 220))
+        prose, code = split_text(self.body_html)
+        # Code is read more slowly than prose, but not word by word.
+        words = len(prose.split()) + len(code.split()) / 2
+        return max(1, math.ceil(words / 220))
 
     @property
     def excerpt(self):
-        text = plain_text(self.body_html)
+        text = prose_text(self.body_html)
         return text if len(text) <= 160 else text[:157].rsplit(" ", 1)[0] + "…"
 
 
