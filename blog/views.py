@@ -62,6 +62,7 @@ def write(request, post_id=None):
         "id": post.id if post else None,
         "title": post.title if post else "",
         "delta": post.body_delta if post else None,
+        "url": post.get_absolute_url() if post else None,
     }
     return render(request, "blog/write.html", {"post": post, "initial": initial})
 
