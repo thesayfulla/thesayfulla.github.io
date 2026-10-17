@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Log in · {{ profile.name }}{% endblock %}
+{% block body_class %}template-form{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block content %}
+<form method="post" class="plain-form narrow">
+    {% csrf_token %}
+    <h1>Log in</h1>
+    {% if form.non_field_errors %}<p class="form-error">Wrong username or password.</p>{% endif %}
+    <label>
+        <span>Username</span>
+        <input type="text" name="username" autocomplete="username" autocapitalize="none" value="{{ form.username.value|default:'' }}" required autofocus>
+    </label>
+    <label>
+        <span>Password</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="pill">Log in</button>
+</form>
+{% endblock %}

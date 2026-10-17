@@ -1,0 +1,521 @@
+// Telegraph-style writing page, built on Quill 2.
+(function () {
+  const initial = JSON.parse(document.getElementById("ed-initial").textContent);
+  const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  const titleEl = document.getElementById("ed-title");
+  const bodyWrap = document.querySelector(".ed-body-wrap");
+  const side = document.getElementById("ed-side");
+  const hint = document.getElementById("ed-hint");
+  const bubble = document.getElementById("ed-bubble");
+  const bubbleButtons = bubble.querySelector(".ed-bubble-buttons");
+  const bubbleLink = bubble.querySelector(".ed-bubble-link");
+  const linkInput = bubbleLink.querySelector("input");
+  const publishBtn = document.getElementById("ed-publish");
+  const deleteBtn = document.getElementById("ed-delete");
+  const statusEl = document.getElementById("ed-status");
+  const fileInput = document.getElementById("ed-file");
+  const DRAFT_KEY = "draft:new-post";
+
+  const esc = (s) =>
+    String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+  // ---------- Embeds ----------
+  function youtubeId(url) {
+    const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/);
+    return m && m[1];
+  }
+  function vimeoId(url) {
+    const m = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+    return m && m[1];
+  }
+  const isGist = (url) => /^https:\/\/gist\.github\.com\/[\w-]+\/[0-9a-f]+\/?$/.test(url);
+  const isTweet = (url) => /^https:\/\/(?:www\.)?(?:x|twitter)\.com\/\w+\/status\/\d+/.test(url);
+  const isKnownEmbed = (url) => !!(youtubeId(url) || vimeoId(url) || isGist(url) || isTweet(url));
+  const isUrl = (s) => /^https?:\/\/\S+$/.test(s);
+
+  // ---------- Custom blocks ----------
+  const BlockEmbed = Quill.import("blots/block/embed");
+
+  class FigureBlot extends BlockEmbed {
+    static blotName = "figure";
+    static tagName = "FIGURE";
+    static className = "ed-figure";
+
+    static create(value) {
+      const node = super.create();
+      node.setAttribute("contenteditable", "false");
+      node.dataset.src = value.src;
+      node.dataset.caption = value.caption || "";
+      const img = document.createElement("img");
+      img.src = value.src;
+      const cap = document.createElement("input");
+      cap.className = "ed-caption";
+      cap.placeholder = "Caption (optional)";
+      cap.value = value.caption || "";
+      // Typing a caption updates the attribute, which Quill notices and saves.
+      cap.addEventListener("input", () => (node.dataset.caption = cap.value));
+      cap.addEventListener("keydown", (e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const blot = Quill.find(node);
+          if (blot) quill.setSelection(quill.getIndex(blot) + 1, 0, "user");
+        }
+      });
+      cap.addEventListener("paste", (e) => e.stopPropagation());
+      node.append(img, cap);
+      return node;
+    }
+    static value(node) {
+      return { src: node.dataset.src, caption: node.dataset.caption || "" };
+    }
+    html() {
+      const v = FigureBlot.value(this.domNode);
+      return `<figure><img src="${esc(v.src)}" alt="${esc(v.caption)}">${
+        v.caption ? `<figcaption>${esc(v.caption)}</figcaption>` : ""
+      }</figure>`;
+    }
+  }
+
+  class EmbedBlot extends BlockEmbed {
+    static blotName = "embed";
+    static tagName = "DIV";
+    static className = "ed-embed";
+
+    static create(url) {
+      const node = super.create();
+      node.setAttribute("contenteditable", "false");
+      node.dataset.url = url;
+      const yt = youtubeId(url), vm = vimeoId(url);
+      if (yt || vm) {
+        node.classList.add("video");
+        const iframe = document.createElement("iframe");
+        iframe.src = yt ? `https://www.youtube-nocookie.com/embed/${yt}` : `https://player.vimeo.com/video/${vm}`;
+        iframe.allowFullscreen = true;
+        iframe.referrerPolicy = "strict-origin-when-cross-origin"; // YouTube refuses to play without a referrer
+        node.append(iframe);
+      } else {
+        const label = isGist(url) ? "GitHub Gist" : isTweet(url) ? "Post on X" : "Embed";
+        node.innerHTML = `<div class="ed-embed-card"><b>${label}</b><span>${esc(url)}</span></div>`;
+      }
+      return node;
+    }
+    static value(node) {
+      return node.dataset.url;
+    }
+    html() {
+      return `<div data-embed="${esc(this.domNode.dataset.url)}"></div>`;
+    }
+  }
+
+  Quill.register(FigureBlot);
+  Quill.register(EmbedBlot);
+
+  // ---------- Markdown-style shortcuts ----------
+  const inCode = (ctx) => !!ctx.format["code-block"];
+  const bindings = {
+    mdHeading: {
+      key: " ",
+      collapsed: true,
+      prefix: /^#{2,3}$/,
+      handler(range, ctx) {
+        if (inCode(ctx)) return true;
+        const start = range.index - ctx.prefix.length;
+        quill.deleteText(start, ctx.prefix.length, "user");
+        quill.formatLine(start, 1, "header", ctx.prefix.length === 2 ? 3 : 4, "user");
+        return false;
+      },
+    },
+    mdQuote: {
+      key: " ",
+      collapsed: true,
+      prefix: /^>$/,
+      handler(range, ctx) {
+        if (inCode(ctx)) return true;
+        quill.deleteText(range.index - 1, 1, "user");
+        quill.formatLine(range.index - 1, 1, "blockquote", true, "user");
+        return false;
+      },
+    },
+    mdCode: {
+      key: "Enter",
+      collapsed: true,
+      prefix: /^```\w*$/,
+      handler(range, ctx) {
+        if (inCode(ctx)) return true;
+        const lang = ctx.prefix.slice(3).toLowerCase();
+        const start = range.index - ctx.prefix.length;
+        quill.deleteText(start, ctx.prefix.length, "user");
+        quill.formatLine(start, 1, "code-block", LANG_KEYS.has(lang) ? lang : "plain", "user");
+        return false;
+      },
+    },
+    linkEmbed: {
+      key: "Enter",
+      collapsed: true,
+      handler(range, ctx) {
+        if (inCode(ctx) || ctx.offset === 0) return true;
+        const text = ctx.line.domNode.textContent.trim();
+        const wanted = awaitingEmbed || isKnownEmbed(text);
+        if (!isUrl(text) || !wanted || ctx.suffix) return true;
+        const start = quill.getIndex(ctx.line);
+        quill.deleteText(start, ctx.line.length() - 1, "user");
+        quill.insertEmbed(start, "embed", text, "user");
+        quill.setSelection(start + 1, 0, "user");
+        awaitingEmbed = false;
+        return false;
+      },
+    },
+    linkShortcut: {
+      key: "k",
+      shortKey: true,
+      handler(range) {
+        if (range.length) openLinkInput();
+        return false;
+      },
+    },
+  };
+
+  const LANGUAGES = [
+    { key: "plain", label: "Plain" },
+    { key: "python", label: "Python" },
+    { key: "javascript", label: "JavaScript" },
+    { key: "typescript", label: "TypeScript" },
+    { key: "xml", label: "HTML" },
+    { key: "css", label: "CSS" },
+    { key: "bash", label: "Bash" },
+    { key: "json", label: "JSON" },
+    { key: "yaml", label: "YAML" },
+    { key: "sql", label: "SQL" },
+    { key: "go", label: "Go" },
+    { key: "rust", label: "Rust" },
+    { key: "java", label: "Java" },
+    { key: "kotlin", label: "Kotlin" },
+    { key: "swift", label: "Swift" },
+    { key: "c", label: "C" },
+    { key: "cpp", label: "C++" },
+    { key: "csharp", label: "C#" },
+    { key: "php", label: "PHP" },
+    { key: "ruby", label: "Ruby" },
+    { key: "diff", label: "Diff" },
+  ];
+  const LANG_KEYS = new Set(LANGUAGES.map((l) => l.key));
+
+  const quill = new Quill("#ed-body", {
+    placeholder: "Your story…",
+    formats: ["bold", "italic", "link", "code", "header", "blockquote", "list", "code-block", "figure", "embed"],
+    modules: {
+      toolbar: false,
+      syntax: { hljs: window.hljs, languages: LANGUAGES },
+      keyboard: { bindings },
+      clipboard: { matchVisual: false },
+    },
+  });
+
+  // ---------- Load existing post / local draft ----------
+  let dirty = false;
+  if (initial.id) {
+    titleEl.value = initial.title;
+    if (initial.delta && initial.delta.ops) quill.setContents(initial.delta, "silent");
+  } else {
+    try {
+      const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+      if (draft) {
+        titleEl.value = draft.title || "";
+        if (draft.delta) quill.setContents(draft.delta, "silent");
+      }
+    } catch (e) {}
+  }
+
+  function autosize() {
+    titleEl.style.height = "auto";
+    titleEl.style.height = titleEl.scrollHeight + "px";
+  }
+  autosize();
+  if (!titleEl.value) titleEl.focus();
+
+  let draftTimer;
+  function changed() {
+    dirty = true;
+    setStatus("");
+    if (initial.id) return;
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ title: titleEl.value, delta: quill.getContents() }));
+      } catch (e) {}
+    }, 400);
+  }
+
+  titleEl.addEventListener("input", () => { autosize(); changed(); });
+  titleEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || (e.key === "ArrowDown" && titleEl.selectionStart === titleEl.value.length)) {
+      e.preventDefault();
+      quill.setSelection(0, 0, "user");
+    }
+  });
+  quill.on("text-change", (_d, _o, source) => { if (source === "user") changed(); });
+  window.addEventListener("beforeunload", (e) => { if (dirty && initial.id) e.preventDefault(); });
+
+  // ---------- Side buttons (empty line) ----------
+  let awaitingEmbed = false;
+  let sideIndex = 0;
+
+  function emptyLineAt(range) {
+    if (!range || range.length) return null;
+    const [line] = quill.getLine(range.index);
+    if (!line || line.statics.blotName !== "block" || line.length() !== 1) return null;
+    return line;
+  }
+
+  function placeAtLine(el, line) {
+    const top = line.domNode.offsetTop;
+    el.style.top = top + "px";
+    el.hidden = false;
+  }
+
+  function updateSide(range) {
+    const line = emptyLineAt(range);
+    if (!line) {
+      side.hidden = true;
+      hint.hidden = true;
+      awaitingEmbed = false;
+      return;
+    }
+    sideIndex = range.index;
+    if (awaitingEmbed) {
+      side.hidden = true;
+      placeAtLine(hint, line);
+    } else {
+      hint.hidden = true;
+      placeAtLine(side, line);
+    }
+  }
+
+  side.addEventListener("mousedown", (e) => e.preventDefault()); // keep editor focus
+  side.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (action === "image") {
+      fileInput.click();
+    } else if (action === "embed") {
+      awaitingEmbed = true;
+      quill.setSelection(sideIndex, 0, "user");
+      updateSide(quill.getSelection());
+    } else if (action === "code") {
+      quill.formatLine(sideIndex, 1, "code-block", "plain", "user");
+      quill.setSelection(sideIndex, 0, "user");
+    }
+  });
+
+  // ---------- Images ----------
+  async function uploadImage(file, index) {
+    if (!file.type.startsWith("image/")) return;
+    setStatus("Uploading image…");
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const res = await fetch("/write/upload/", { method: "POST", body: form, headers: { "X-CSRFToken": csrf } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      const [line] = quill.getLine(index);
+      // Replace the empty line we were on, otherwise insert after the current line
+      // (never split a paragraph or code block in two).
+      if (line && line.statics.blotName === "block" && line.length() === 1) {
+        quill.insertEmbed(index, "figure", { src: data.url, caption: "" }, "user");
+        quill.deleteText(index + 1, 1, "user");
+      } else {
+        // Inside a code block, go below the whole block, not just this line.
+        const after = line && line.statics.blotName === "code-block" ? line.parent : line;
+        index = after ? quill.getIndex(after) + after.length() : quill.getLength() - 1;
+        quill.insertEmbed(index, "figure", { src: data.url, caption: "" }, "user");
+      }
+      if (quill.getLength() <= index + 1) quill.insertText(quill.getLength(), "\n", "user");
+      quill.setSelection(index + 1, 0, "user");
+      setStatus("");
+    } catch (err) {
+      setStatus(err.message, true);
+    }
+  }
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    fileInput.value = "";
+    if (file) uploadImage(file, sideIndex);
+  });
+
+  function filesFrom(dt) {
+    return dt ? [...dt.files].filter((f) => f.type.startsWith("image/")) : [];
+  }
+  quill.root.addEventListener("paste", (e) => {
+    const files = filesFrom(e.clipboardData);
+    if (!files.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const range = quill.getSelection(true);
+    files.forEach((f) => uploadImage(f, range.index));
+  }, true);
+  quill.root.addEventListener("drop", (e) => {
+    const files = filesFrom(e.dataTransfer);
+    if (!files.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const range = quill.getSelection(true) || { index: quill.getLength() - 1 };
+    files.forEach((f) => uploadImage(f, range.index));
+  }, true);
+
+  // ---------- Selection bubble ----------
+  let savedRange = null;
+
+  function updateBubble(range) {
+    if (!range || !range.length || !bubbleLink.hidden) {
+      if (bubbleLink.hidden) bubble.hidden = true;
+      return;
+    }
+    const fmt = quill.getFormat(range);
+    if (fmt["code-block"]) {
+      bubble.hidden = true;
+      return;
+    }
+    bubbleButtons.querySelectorAll("button").forEach((b) => {
+      const f = b.dataset.format;
+      const on =
+        f === "h3" ? fmt.header === 3 :
+        f === "h4" ? fmt.header === 4 :
+        !!fmt[f];
+      b.classList.toggle("on", on);
+    });
+    positionBubble(range);
+  }
+
+  function positionBubble(range) {
+    bubble.hidden = false;
+    const b = quill.getBounds(range.index, range.length);
+    const rootRect = quill.root.getBoundingClientRect();
+    const w = bubble.offsetWidth;
+    let left = rootRect.left + window.scrollX + b.left + b.width / 2 - w / 2;
+    left = Math.max(8, Math.min(left, document.documentElement.clientWidth - w - 8));
+    bubble.style.left = left + "px";
+    bubble.style.top = rootRect.top + window.scrollY + b.top - bubble.offsetHeight - 10 + "px";
+  }
+
+  bubble.addEventListener("mousedown", (e) => {
+    if (e.target !== linkInput) e.preventDefault();
+  });
+  bubbleButtons.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const range = quill.getSelection();
+    if (!range) return;
+    const fmt = quill.getFormat(range);
+    const f = btn.dataset.format;
+    if (f === "link") {
+      if (fmt.link) quill.format("link", false, "user");
+      else return openLinkInput();
+    } else if (f === "h3" || f === "h4") {
+      const level = f === "h3" ? 3 : 4;
+      quill.format("header", fmt.header === level ? false : level, "user");
+    } else {
+      quill.format(f, !fmt[f], "user");
+    }
+    updateBubble(quill.getSelection());
+  });
+
+  function openLinkInput() {
+    savedRange = quill.getSelection();
+    if (!savedRange || !savedRange.length) return;
+    bubbleButtons.hidden = true;
+    bubbleLink.hidden = false;
+    linkInput.value = "";
+    positionBubble(savedRange);
+    linkInput.focus();
+  }
+
+  function closeLinkInput(apply) {
+    if (apply && savedRange) {
+      let url = linkInput.value.trim();
+      if (url && !/^(https?:|mailto:|\/|#)/.test(url)) url = "https://" + url;
+      quill.setSelection(savedRange, "silent");
+      if (url) quill.formatText(savedRange.index, savedRange.length, "link", url, "user");
+    }
+    bubbleLink.hidden = true;
+    bubbleButtons.hidden = false;
+    bubble.hidden = true;
+    if (savedRange) quill.setSelection(savedRange.index + savedRange.length, 0, "user");
+    savedRange = null;
+  }
+
+  linkInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); closeLinkInput(true); }
+    if (e.key === "Escape") { e.preventDefault(); closeLinkInput(false); }
+  });
+  linkInput.addEventListener("blur", () => setTimeout(() => { if (!bubbleLink.hidden) closeLinkInput(false); }, 100));
+
+  quill.on("editor-change", () => {
+    const range = quill.getSelection();
+    if (!range) return;
+    updateSide(range);
+    updateBubble(range);
+  });
+  quill.on("selection-change", (range) => {
+    if (!range) {
+      side.hidden = true;
+      if (bubbleLink.hidden) bubble.hidden = true;
+    }
+  });
+  window.addEventListener("resize", () => {
+    const range = quill.getSelection();
+    if (range) { updateSide(range); updateBubble(range); }
+  });
+
+  // ---------- Publish / delete ----------
+  function setStatus(text, isError) {
+    statusEl.textContent = text;
+    statusEl.classList.toggle("error", !!isError);
+  }
+
+  function semanticHtml() {
+    // Quill turns spaces into &nbsp; here; the server normalises them back.
+    return quill.getSemanticHTML();
+  }
+
+  async function publish() {
+    const title = titleEl.value.trim();
+    if (!title) { titleEl.focus(); return setStatus("Add a title first.", true); }
+    if (quill.getLength() <= 1) { quill.focus(); return setStatus("Write something first.", true); }
+    publishBtn.disabled = true;
+    setStatus(initial.id ? "Saving…" : "Publishing…");
+    try {
+      const res = await fetch("/write/save/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify({ id: initial.id, title, delta: quill.getContents(), html: semanticHtml() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      dirty = false;
+      try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+      window.location.href = data.url;
+    } catch (err) {
+      setStatus(err.message, true);
+      publishBtn.disabled = false;
+    }
+  }
+  publishBtn.addEventListener("click", publish);
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") publish();
+    if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (initial.id) publish(); }
+  });
+
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", async () => {
+      if (!confirm("Delete this post? This can't be undone.")) return;
+      const res = await fetch(`/write/${initial.id}/delete/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
+      const data = await res.json();
+      dirty = false;
+      if (res.ok) window.location.href = data.url;
+      else setStatus(data.error || "Couldn't delete.", true);
+    });
+  }
+})();

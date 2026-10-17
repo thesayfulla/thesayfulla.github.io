@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Settings · {{ profile.name }}{% endblock %}
+{% block body_class %}template-form{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.bubble.css">
+{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" class="plain-form" id="settings-form">
+    {% csrf_token %}
+    <h1>Settings</h1>
+    {% if messages %}{% for m in messages %}<p class="form-ok">{{ m }}</p>{% endfor %}{% endif %}
+    {% if form.errors %}<p class="form-error">Please fix the fields marked below.</p>{% endif %}
+
+    <fieldset>
+        <legend>You</legend>
+        <label>
+            <span>Header text</span>
+            <input type="text" name="handle" value="{{ form.handle.value|default:'' }}" maxlength="60" required>
+            {{ form.handle.errors }}
+        </label>
+        <label>
+            <span>Full name <small>— used in browser tab titles</small></span>
+            <input type="text" name="name" value="{{ form.name.value|default:'' }}" maxlength="100" required>
+            {{ form.name.errors }}
+        </label>
+        <div class="field">
+            <span>Bio <small>— select text to make it bold, italic or a link</small></span>
+            <div id="intro-editor" class="intro-editor prose"></div>
+            <input type="hidden" name="intro" id="intro-input" value="{{ form.intro.value|default:'' }}">
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Links <small>— leave empty to hide</small></legend>
+        <label><span>X</span><input type="url" name="x_url" value="{{ form.x_url.value|default:'' }}" placeholder="https://x.com/yourname">{{ form.x_url.errors }}</label>
+        <label><span>LinkedIn</span><input type="url" name="linkedin_url" value="{{ form.linkedin_url.value|default:'' }}" placeholder="https://linkedin.com/in/yourname">{{ form.linkedin_url.errors }}</label>
+        <label><span>GitHub</span><input type="url" name="github_url" value="{{ form.github_url.value|default:'' }}" placeholder="https://github.com/yourname">{{ form.github_url.errors }}</label>
+        <label><span>Email</span><input type="email" name="email" value="{{ form.email.value|default:'' }}">{{ form.email.errors }}</label>
+    </fieldset>
+
+    <fieldset>
+        <legend>Home page</legend>
+        <div class="field">
+            <span>Hero video <small>— optional .mp4 or .webm, shown with the dot effect</small></span>
+            {% if profile.hero_video %}
+            <p class="current-file">Current: <a href="{{ profile.hero_video.url }}" target="_blank">{{ profile.hero_video.name|cut:"hero/" }}</a>
+                <label class="inline"><input type="checkbox" name="remove_video"> remove</label></p>
+            {% endif %}
+            <input type="file" name="hero_video" accept="video/mp4,video/webm">
+            {{ form.hero_video.errors }}
+        </div>
+        <label>
+            <span>Recent posts to list <small>— 0 hides the list</small></span>
+            <input type="number" name="latest_posts" value="{{ form.latest_posts.value|default:'0' }}" min="0" max="50">
+            {{ form.latest_posts.errors }}
+        </label>
+    </fieldset>
+
+    <button type="submit" class="pill">Save</button>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script>
+    (function () {
+        const input = document.getElementById("intro-input");
+        const quill = new Quill("#intro-editor", {
+            theme: "bubble",
+            formats: ["bold", "italic", "link"],
+            modules: { toolbar: ["bold", "italic", "link"] },
+        });
+        quill.clipboard.dangerouslyPasteHTML(input.value, "silent");
+        document.getElementById("settings-form").addEventListener("submit", () => {
+            input.value = quill.getLength() > 1 ? quill.getSemanticHTML() : "";
+        });
+    })();
+</script>
+{% endblock %}

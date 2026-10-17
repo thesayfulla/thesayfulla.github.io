@@ -1,0 +1,4 @@
+Django>=6.1,<6.2
+Pillow>=11
+Pygments>=2.19
+nh3>=0.2
