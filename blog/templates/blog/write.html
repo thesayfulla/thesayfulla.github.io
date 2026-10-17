@@ -43,8 +43,8 @@
 
     <div class="ed-actions">
         <button type="button" id="ed-publish" class="ed-publish">{% if post %}Save{% else %}Publish{% endif %}</button>
+        <button type="button" id="ed-cancel" class="ed-link">cancel</button>
         {% if post %}
-        <a href="{{ post.get_absolute_url }}" class="ed-link">view</a>
         <button type="button" id="ed-delete" class="ed-link ed-danger">delete</button>
         {% endif %}
         <span id="ed-status" class="ed-status" role="status"></span>

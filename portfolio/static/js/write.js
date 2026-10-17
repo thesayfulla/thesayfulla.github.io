@@ -8,6 +8,7 @@
   const hint = document.getElementById("ed-hint");
   const publishBtn = document.getElementById("ed-publish");
   const deleteBtn = document.getElementById("ed-delete");
+  const cancelBtn = document.getElementById("ed-cancel");
   const statusEl = document.getElementById("ed-status");
   const fileInput = document.getElementById("ed-file");
   const DRAFT_KEY = "draft:new-post";
@@ -417,6 +418,29 @@
   document.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") publish();
     if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (initial.id) publish(); }
+  });
+
+  // Leave without saving: back to the post when editing, otherwise to where you came from.
+  cancelBtn.addEventListener("click", () => {
+    if (initial.id) {
+      if (dirty && !confirm("Discard your changes?")) return;
+      dirty = false;
+      window.location.href = initial.url;
+      return;
+    }
+    const hasContent = titleEl.value.trim() || quill.getLength() > 1;
+    if (hasContent && !confirm("Discard this draft?")) return;
+    clearTimeout(draftTimer);
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+    dirty = false;
+    let back = "/blog/";
+    try {
+      const ref = new URL(document.referrer);
+      if (ref.origin === location.origin && !ref.pathname.startsWith("/write/") && !ref.pathname.startsWith("/login/")) {
+        back = ref.pathname + ref.search;
+      }
+    } catch (e) {}
+    window.location.href = back;
   });
 
   if (deleteBtn) {
