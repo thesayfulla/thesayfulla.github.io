@@ -6,10 +6,6 @@
   const bodyWrap = document.querySelector(".ed-body-wrap");
   const side = document.getElementById("ed-side");
   const hint = document.getElementById("ed-hint");
-  const bubble = document.getElementById("ed-bubble");
-  const bubbleButtons = bubble.querySelector(".ed-bubble-buttons");
-  const bubbleLink = bubble.querySelector(".ed-bubble-link");
-  const linkInput = bubbleLink.querySelector("input");
   const publishBtn = document.getElementById("ed-publish");
   const deleteBtn = document.getElementById("ed-delete");
   const statusEl = document.getElementById("ed-status");
@@ -169,8 +165,8 @@
     linkShortcut: {
       key: "k",
       shortKey: true,
-      handler(range) {
-        if (range.length) openLinkInput();
+      handler() {
+        kit.openLink();
         return false;
       },
     },
@@ -365,108 +361,23 @@
     files.forEach((f) => uploadImage(f, range.index));
   }, true);
 
-  // ---------- Selection bubble ----------
-  let savedRange = null;
-
-  function updateBubble(range) {
-    if (!range || !range.length || !bubbleLink.hidden) {
-      if (bubbleLink.hidden) bubble.hidden = true;
-      return;
-    }
-    const fmt = quill.getFormat(range);
-    if (fmt["code-block"]) {
-      bubble.hidden = true;
-      return;
-    }
-    bubbleButtons.querySelectorAll("button").forEach((b) => {
-      const f = b.dataset.format;
-      const on =
-        f === "h3" ? fmt.header === 3 :
-        f === "h4" ? fmt.header === 4 :
-        !!fmt[f];
-      b.classList.toggle("on", on);
-    });
-    positionBubble(range);
-  }
-
-  function positionBubble(range) {
-    bubble.hidden = false;
-    const b = quill.getBounds(range.index, range.length);
-    const rootRect = quill.root.getBoundingClientRect();
-    const w = bubble.offsetWidth;
-    let left = rootRect.left + window.scrollX + b.left + b.width / 2 - w / 2;
-    left = Math.max(8, Math.min(left, document.documentElement.clientWidth - w - 8));
-    bubble.style.left = left + "px";
-    bubble.style.top = rootRect.top + window.scrollY + b.top - bubble.offsetHeight - 10 + "px";
-  }
-
-  bubble.addEventListener("mousedown", (e) => {
-    if (e.target !== linkInput) e.preventDefault();
+  // ---------- Toolbar for selected text + link card ----------
+  const kit = EditorKit.attach(quill, {
+    buttons: ["bold", "italic", "link", "code", "|", "h3", "h4", "blockquote"],
+    hideIn: ["code-block"],
   });
-  bubbleButtons.addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    if (!btn) return;
-    const range = quill.getSelection();
-    if (!range) return;
-    const fmt = quill.getFormat(range);
-    const f = btn.dataset.format;
-    if (f === "link") {
-      if (fmt.link) quill.format("link", false, "user");
-      else return openLinkInput();
-    } else if (f === "h3" || f === "h4") {
-      const level = f === "h3" ? 3 : 4;
-      quill.format("header", fmt.header === level ? false : level, "user");
-    } else {
-      quill.format(f, !fmt[f], "user");
-    }
-    updateBubble(quill.getSelection());
-  });
-
-  function openLinkInput() {
-    savedRange = quill.getSelection();
-    if (!savedRange || !savedRange.length) return;
-    bubbleButtons.hidden = true;
-    bubbleLink.hidden = false;
-    linkInput.value = "";
-    positionBubble(savedRange);
-    linkInput.focus();
-  }
-
-  function closeLinkInput(apply) {
-    if (apply && savedRange) {
-      let url = linkInput.value.trim();
-      if (url && !/^(https?:|mailto:|\/|#)/.test(url)) url = "https://" + url;
-      quill.setSelection(savedRange, "silent");
-      if (url) quill.formatText(savedRange.index, savedRange.length, "link", url, "user");
-    }
-    bubbleLink.hidden = true;
-    bubbleButtons.hidden = false;
-    bubble.hidden = true;
-    if (savedRange) quill.setSelection(savedRange.index + savedRange.length, 0, "user");
-    savedRange = null;
-  }
-
-  linkInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); closeLinkInput(true); }
-    if (e.key === "Escape") { e.preventDefault(); closeLinkInput(false); }
-  });
-  linkInput.addEventListener("blur", () => setTimeout(() => { if (!bubbleLink.hidden) closeLinkInput(false); }, 100));
 
   quill.on("editor-change", () => {
     const range = quill.getSelection();
     if (!range) return;
     updateSide(range);
-    updateBubble(range);
   });
   quill.on("selection-change", (range) => {
-    if (!range) {
-      side.hidden = true;
-      if (bubbleLink.hidden) bubble.hidden = true;
-    }
+    if (!range) side.hidden = true;
   });
   window.addEventListener("resize", () => {
     const range = quill.getSelection();
-    if (range) { updateSide(range); updateBubble(range); }
+    if (range) updateSide(range);
   });
 
   // ---------- Publish / delete ----------

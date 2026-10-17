@@ -129,7 +129,7 @@
   gap: 6px;
   transform: translateY(-1px);
 }
-.ed-side[hidden], .ed-hint[hidden], .ed-bubble[hidden] { display: none; }
+.ed-side[hidden], .ed-hint[hidden] { display: none; }
 .ed-side button {
   width: 30px;
   height: 30px;
@@ -159,66 +159,6 @@
 @media (max-width: 860px) {
   .ed-side { right: auto; left: 0; }
 }
-
-/* Floating toolbar above selected text */
-.ed-bubble {
-  position: absolute;
-  z-index: 10;
-  background: #1c1c1e;
-  color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
-  padding: 3px;
-}
-:root[data-theme="dark"] .ed-bubble { background: #2c2c2e; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .ed-bubble { background: #2c2c2e; }
-}
-.ed-bubble::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -5px;
-  margin-left: -6px;
-  border: 6px solid transparent;
-  border-bottom: 0;
-  border-top-color: inherit;
-  border-top: 6px solid #1c1c1e;
-}
-.ed-bubble-buttons { display: flex; align-items: center; }
-.ed-bubble-buttons[hidden], .ed-bubble-link[hidden] { display: none; }
-.ed-bubble button {
-  width: 34px;
-  height: 32px;
-  border: 0;
-  background: none;
-  color: #d1d1d6;
-  border-radius: 6px;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  font: 17px "Times New Roman", Times, serif;
-  padding: 0;
-}
-.ed-bubble button:hover { color: #fff; background: rgba(255, 255, 255, .08); }
-.ed-bubble button.on { color: #8ab4ff; }
-.ed-bubble button svg { width: 17px; height: 17px; }
-.ed-bubble .mono { font: 12px ui-monospace, "SF Mono", Menlo, monospace; }
-.ed-bubble .t-big { font-size: 20px; font-weight: 700; }
-.ed-bubble .t-small { font-size: 14px; font-weight: 700; }
-.ed-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, .18); margin: 0 3px; }
-.ed-bubble-link input {
-  width: 280px;
-  max-width: 70vw;
-  height: 32px;
-  border: 0;
-  outline: 0;
-  background: none;
-  color: #fff;
-  font: 15px "Times New Roman", Times, serif;
-  padding: 0 10px;
-}
-.ed-bubble-link input::placeholder { color: #8e8e93; }
 
 /* Publish row */
 .ed-actions {

@@ -1,10 +1,12 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Settings · {{ profile.name }}{% endblock %}
 {% block body_class %}template-form{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.bubble.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.core.css">
+<link rel="stylesheet" href="{% static 'css/editor-kit.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -27,7 +29,7 @@
             {{ form.name.errors }}
         </label>
         <div class="field">
-            <span>Bio <small>— select text to make it bold, italic or a link</small></span>
+            <span>Bio <small>— select text to make it bold, italic or a link; hover a link to change it</small></span>
             <div id="intro-editor" class="intro-editor prose"></div>
             <input type="hidden" name="intro" id="intro-input" value="{{ form.intro.value|default:'' }}">
         </div>
@@ -65,14 +67,18 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script src="{% static 'js/editor-kit.js' %}"></script>
 <script>
     (function () {
         const input = document.getElementById("intro-input");
         const quill = new Quill("#intro-editor", {
-            theme: "bubble",
             formats: ["bold", "italic", "link"],
-            modules: { toolbar: ["bold", "italic", "link"] },
+            modules: {
+                toolbar: false,
+                keyboard: { bindings: { link: { key: "k", shortKey: true, handler: () => { kit.openLink(); return false; } } } },
+            },
         });
+        const kit = EditorKit.attach(quill, { buttons: ["bold", "italic", "link"] });
         quill.clipboard.dangerouslyPasteHTML(input.value, "silent");
         document.getElementById("settings-form").addEventListener("submit", () => {
             input.value = quill.getLength() > 1 ? quill.getSemanticHTML() : "";
