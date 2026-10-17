@@ -1,0 +1,110 @@
+/* Floating toolbar (selected text) and link card, shared by /write/ and /settings/. */
+
+.ek-bar[hidden], .ek-link[hidden], .ek-link [hidden] { display: none !important; }
+
+.ek-bar, .ek-link {
+  --ek-bg: #1c1c1e;
+  position: absolute;
+  z-index: 20;
+  background: var(--ek-bg);
+  color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .28);
+}
+:root[data-theme="dark"] .ek-bar, :root[data-theme="dark"] .ek-link { --ek-bg: #2c2c2e; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ek-bar, :root:not([data-theme="light"]) .ek-link { --ek-bg: #2c2c2e; }
+}
+
+/* Toolbar */
+.ek-bar { display: flex; align-items: center; padding: 3px; }
+.ek-bar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-bottom: 0;
+  border-top-color: var(--ek-bg);
+}
+.ek-bar button {
+  width: 34px;
+  height: 32px;
+  border: 0;
+  background: none;
+  color: #d1d1d6;
+  border-radius: 6px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font: 17px "Times New Roman", Times, serif;
+  padding: 0;
+}
+.ek-bar button:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+.ek-bar button.on { color: #8ab4ff; }
+.ek-bar button svg { width: 17px; height: 17px; }
+.ek-bar .mono { font: 12px ui-monospace, "SF Mono", Menlo, monospace; }
+.ek-bar .t-big { font-size: 20px; font-weight: 700; }
+.ek-bar .t-small { font-size: 14px; font-weight: 700; }
+.ek-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, .18); margin: 0 3px; }
+
+/* Link card */
+.ek-link {
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  padding: 10px 12px 8px;
+  font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+.ek-link::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-top: 0;
+  border-bottom-color: var(--ek-bg);
+}
+.ek-link label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+.ek-link label span { width: 32px; flex: none; color: #8e8e93; font-size: 12px; }
+.ek-link input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .06);
+  color: #fff;
+  font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  outline: none;
+}
+.ek-link input:focus { border-color: #8ab4ff; }
+.ek-link input::placeholder { color: #6e6e73; }
+.ek-link-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 2px 40px;
+}
+.ek-link-actions button, .ek-link-actions a {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #d1d1d6;
+  cursor: pointer;
+  text-decoration: none;
+}
+.ek-link-actions .ek-save { color: #8ab4ff; font-weight: 600; }
+.ek-link-actions button:hover, .ek-link-actions a:hover { color: #fff; }
+.ek-link-actions .ek-remove { margin-left: auto; }
+.ek-link-actions .ek-remove:hover { color: #ff6b6b; }

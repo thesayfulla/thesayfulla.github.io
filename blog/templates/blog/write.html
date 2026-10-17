@@ -7,6 +7,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.core.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<link rel="stylesheet" href="{% static 'css/editor-kit.css' %}">
 <link rel="stylesheet" href="{% static 'css/write.css' %}">
 {% endblock %}
 
@@ -50,27 +51,6 @@
     </div>
 </article>
 
-<!-- Shown above selected text -->
-<div id="ed-bubble" class="ed-bubble" hidden>
-    <div class="ed-bubble-buttons">
-        <button type="button" data-format="bold" title="Bold (⌘B)"><b>B</b></button>
-        <button type="button" data-format="italic" title="Italic (⌘I)"><i>i</i></button>
-        <button type="button" data-format="link" title="Link (⌘K)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
-        </button>
-        <button type="button" data-format="code" title="Inline code"><span class="mono">&lt;/&gt;</span></button>
-        <span class="ed-sep"></span>
-        <button type="button" data-format="h3" title="Heading"><span class="t-big">T</span></button>
-        <button type="button" data-format="h4" title="Subheading"><span class="t-small">T</span></button>
-        <button type="button" data-format="blockquote" title="Quote">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 17c-1.7 0-3-1.3-3-3 0-3.3 2-6 5-7l.6 1.2C6.8 9 6 10.3 6 11.5c.2 0 .5-.1.8-.1 1.6 0 2.7 1.2 2.7 2.8S8.1 17 6 17zm9 0c-1.7 0-3-1.3-3-3 0-3.3 2-6 5-7l.6 1.2C15.8 9 15 10.3 15 11.5c.2 0 .5-.1.8-.1 1.6 0 2.7 1.2 2.7 2.8S17.1 17 15 17z"/></svg>
-        </button>
-    </div>
-    <div class="ed-bubble-link" hidden>
-        <input type="text" placeholder="Paste or type a link…" spellcheck="false">
-    </div>
-</div>
-
 <input type="file" id="ed-file" accept="image/*" hidden>
 {{ initial|json_script:"ed-initial" }}
 {% csrf_token %}
@@ -79,5 +59,6 @@
 {% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script src="{% static 'js/editor-kit.js' %}"></script>
 <script src="{% static 'js/write.js' %}"></script>
 {% endblock %}

@@ -288,9 +288,9 @@ figcaption { color: var(--muted); font-size: 14px; text-align: center; margin-to
   padding: 2px 12px;
 }
 .intro-editor.ql-container { font: inherit; }
-.intro-editor .ql-editor { padding: 8px 0; line-height: 1.7; font-size: 17px; }
+.intro-editor .ql-editor { padding: 8px 0; line-height: 1.7; font-size: 17px; outline: none; }
+.intro-editor .ql-editor a { cursor: text; }
 .intro-editor .ql-editor p + p { margin-top: 12px; }
-.intro-editor .ql-tooltip { z-index: 5; }
 
 .pill {
   border: 2px solid var(--fg);
