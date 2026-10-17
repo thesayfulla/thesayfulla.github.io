@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block body_class %}template-home{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <video id="hero-video" muted loop autoplay playsinline preload="auto"{% if profile.hero_video %} data-src="{{ profile.hero_video.url }}"{% endif %}></video>
+    <canvas id="hero-canvas" aria-hidden="true"></canvas>
+</div>
+
+<div class="intro">{{ profile.intro|safe }}</div>
+
+{% if latest_posts %}
+<h2 class="section-title">writing</h2>
+<ul class="post-list">
+    {% for post in latest_posts %}
+    <li>
+        <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+        <time datetime="{{ post.created_at|date:'Y-m-d' }}">{{ post.created_at|date:"M j, Y" }}</time>
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

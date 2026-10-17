@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Blog · {{ profile.name }}{% endblock %}
+{% block body_class %}template-blog-index{% endblock %}
+
+{% block content %}
+<div class="article-head">
+    <h1>Blog</h1>
+</div>
+
+{% if posts %}
+<ul class="post-list" style="margin-top: 24px">
+    {% for post in posts %}
+    <li class="with-summary">
+        <span>
+            <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
+            {% if post.excerpt %}<span class="summary">{{ post.excerpt }}</span>{% endif %}
+        </span>
+        <time datetime="{{ post.created_at|date:'Y-m-d' }}">{{ post.created_at|date:"M j, Y" }}</time>
+    </li>
+    {% endfor %}
+</ul>
+
+{% if posts.has_other_pages %}
+<nav class="pager">
+    <span>{% if posts.has_previous %}<a href="?page={{ posts.previous_page_number }}">← newer</a>{% endif %}</span>
+    <span>{% if posts.has_next %}<a href="?page={{ posts.next_page_number }}">older →</a>{% endif %}</span>
+</nav>
+{% endif %}
+{% else %}
+<p class="empty">Nothing here yet — first article coming soon.{% if user.is_staff %} <a href="{% url 'blog:write' %}">Write one →</a>{% endif %}</p>
+{% endif %}
+{% endblock %}

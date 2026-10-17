@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }} · {{ profile.name }}{% endblock %}
+{% block meta %}
+<meta name="description" content="{{ post.excerpt }}" />
+<meta property="og:title" content="{{ post.title }}" />
+<meta property="og:description" content="{{ post.excerpt }}" />
+<meta property="og:type" content="article" />
+{% endblock %}
+{% block body_class %}template-blog-page{% endblock %}
+
+{% block content %}
+<article>
+    <header class="article-head">
+        <h1>{{ post.title }}</h1>
+        <div class="article-meta">
+            <time datetime="{{ post.created_at|date:'Y-m-d' }}">{{ post.created_at|date:"F j, Y" }}</time>
+            · {{ post.reading_minutes }} min read
+        </div>
+    </header>
+
+    <div class="prose">{{ post.body_html|safe }}</div>
+</article>
+
+<p class="back">
+    <a href="{% url 'blog:list' %}">← all posts</a>
+    {% if user.is_staff %}<a href="{% url 'blog:edit' post.id %}" style="margin-left: 18px">edit</a>{% endif %}
+</p>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll(".codeblock-copy").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const code = btn.closest(".codeblock").querySelector("pre").innerText;
+            try {
+                await navigator.clipboard.writeText(code);
+                btn.textContent = "copied";
+            } catch (e) {
+                btn.textContent = "failed";
+            }
+            setTimeout(() => (btn.textContent = "copy"), 1500);
+        });
+    });
+</script>
+{% endblock %}
