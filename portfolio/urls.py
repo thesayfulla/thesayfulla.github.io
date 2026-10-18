@@ -5,8 +5,9 @@ from django.urls import include, path
 from home import views as home_views
 
 urlpatterns = [
-    path("", home_views.home, name="home"),
-    path("settings/", home_views.settings_view, name="settings"),
+    path("", home_views.HomeView.as_view(), name="home"),
+    path("cv/", home_views.CVView.as_view(), name="cv"),
+    path("settings/", home_views.SettingsView.as_view(), name="settings"),
     path("login/", auth_views.LoginView.as_view(template_name="login.html", redirect_authenticated_user=True), name="login"),
     path("logout/", auth_views.LogoutView.as_view(next_page="/"), name="logout"),
     path("", include("blog.urls")),

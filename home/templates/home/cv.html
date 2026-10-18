@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Résumé · {{ profile.name }}{% endblock %}
+{% block meta %}<meta name="description" content="{{ profile.name }} — {{ cv.TITLE }}. Resume." />{% endblock %}
+{% block body_class %}template-cv{% endblock %}
+
+{% block content %}
+<article class="cv">
+    <div class="cv-head">
+        <h1>Résumé</h1>
+        <a class="cv-download" href="{% static 'cv/sayfulla-mirxalikov-cv.pdf' %}" download>PDF ↓</a>
+    </div>
+
+    <p class="cv-summary">{{ cv.SUMMARY|safe }}</p>
+
+    <h2 class="section-title">experience</h2>
+    {% for job in cv.EXPERIENCE %}
+    <section class="cv-job">
+        <div class="cv-job-head">
+            <h3>
+                {% if job.url %}<a href="{{ job.url }}" target="_blank" rel="noopener noreferrer">{{ job.company }}</a>{% else %}{{ job.company }}{% endif %}
+                <span class="cv-role">— {{ job.role }}</span>
+            </h3>
+            <span class="cv-dates">{{ job.dates }}</span>
+        </div>
+        <p class="cv-about">{{ job.about }}</p>
+        <ul>
+            {% for lead, rest in job.bullets %}<li><b>{{ lead }}</b> {{ rest }}</li>{% endfor %}
+        </ul>
+    </section>
+    {% endfor %}
+
+    <h2 class="section-title">awards</h2>
+    <ul class="cv-awards">
+        {% for name, detail in cv.AWARDS %}<li><b>{{ name }}</b> — {{ detail }}</li>{% endfor %}
+    </ul>
+</article>
+{% endblock %}

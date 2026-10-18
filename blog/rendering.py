@@ -36,7 +36,7 @@ EMBED_RE = re.compile(r'<div data-embed="([^"]+)"></div>')
 GIST_RE = re.compile(r"^https://gist\.github\.com/[\w-]+/[0-9a-f]+/?$")
 TWEET_RE = re.compile(r"^https://(?:www\.)?(?:x|twitter)\.com/\w+/status/\d+")
 FIGURE_IMG_RE = re.compile(r"<img ")
-EMPTY_TAIL_RE = re.compile(r"(?:<p>(?:\s|<br>)*</p>)+$")
+EMPTY_EDGES_RE = re.compile(r"^(?:<p>(?:\s|<br>)*</p>)+|(?:<p>(?:\s|<br>)*</p>)+$")
 
 
 def sanitize(raw):
@@ -116,7 +116,7 @@ def render_article(raw_html):
     clean = PRE_RE.sub(render_code, clean)
     clean = EMBED_RE.sub(lambda m: render_embed(m.group(1)), clean)
     clean = FIGURE_IMG_RE.sub('<img loading="lazy" ', clean)
-    return EMPTY_TAIL_RE.sub("", clean)
+    return EMPTY_EDGES_RE.sub("", clean)
 
 
 PROSE_TAGS = {"p", "h3", "h4", "blockquote", "li"}

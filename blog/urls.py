@@ -5,11 +5,12 @@ from . import views
 app_name = "blog"
 
 urlpatterns = [
-    path("blog/", views.post_list, name="list"),
-    path("blog/<slug:slug>/", views.post_detail, name="post"),
-    path("write/", views.write, name="write"),
-    path("write/<int:post_id>/", views.write, name="edit"),
-    path("write/save/", views.save, name="save"),
-    path("write/upload/", views.upload_image, name="upload"),
-    path("write/<int:post_id>/delete/", views.delete, name="delete"),
+    path("blog/", views.PostListView.as_view(), name="list"),
+    path("blog/page/<int:page>/", views.PostListView.as_view(), name="list-page"),
+    path("blog/<slug:slug>/", views.PostDetailView.as_view(), name="post"),
+    path("write/", views.EditorView.as_view(), name="write"),
+    path("write/<int:post_id>/", views.EditorView.as_view(), name="edit"),
+    path("write/save/", views.PostSaveView.as_view(), name="save"),
+    path("write/upload/", views.ImageUploadView.as_view(), name="upload"),
+    path("write/<int:post_id>/delete/", views.PostDeleteView.as_view(), name="delete"),
 ]
