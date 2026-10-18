@@ -4,8 +4,14 @@
     {
       "name": "portfolio",
       "runtimeExecutable": ".venv/bin/python",
-      "runtimeArgs": ["manage.py", "runserver", "8000"],
-      "port": 8000
+      "runtimeArgs": ["manage.py", "runserver", "8001"],
+      "port": 8001
+    },
+    {
+      "name": "static-docs",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8010", "--directory", "docs"],
+      "port": 8010
     }
   ]
 }
