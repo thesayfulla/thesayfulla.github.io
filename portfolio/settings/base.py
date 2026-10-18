@@ -11,10 +11,27 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
+import os
 from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = PROJECT_DIR.parent
+
+
+def _load_secret_key():
+    """DJANGO_SECRET_KEY from the environment, else a random key kept in .secret_key (git-ignored)."""
+    if key := os.environ.get("DJANGO_SECRET_KEY"):
+        return key
+    path = BASE_DIR / ".secret_key"
+    if not path.exists():
+        from django.core.management.utils import get_random_secret_key
+
+        path.write_text(get_random_secret_key())
+        path.chmod(0o600)
+    return path.read_text().strip()
+
+
+SECRET_KEY = _load_secret_key()
 
 
 # Quick-start development settings - unsuitable for production
