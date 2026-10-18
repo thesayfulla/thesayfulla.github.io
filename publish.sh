@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+.venv/bin/python manage.py backup      # db + media -> ~/Documents/Portfolio Backups
 .venv/bin/python manage.py build_site
 
 git add -A docs
