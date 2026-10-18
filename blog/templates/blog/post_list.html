@@ -21,10 +21,10 @@
     {% endfor %}
 </ul>
 
-{% if posts.has_other_pages %}
+{% if is_paginated %}
 <nav class="pager">
-    <span>{% if posts.has_previous %}<a href="?page={{ posts.previous_page_number }}">← newer</a>{% endif %}</span>
-    <span>{% if posts.has_next %}<a href="?page={{ posts.next_page_number }}">older →</a>{% endif %}</span>
+    <span>{% if page_obj.has_previous %}{% if page_obj.previous_page_number == 1 %}<a href="{% url 'blog:list' %}">← newer</a>{% else %}<a href="{% url 'blog:list-page' page_obj.previous_page_number %}">← newer</a>{% endif %}{% endif %}</span>
+    <span>{% if page_obj.has_next %}<a href="{% url 'blog:list-page' page_obj.next_page_number %}">older →</a>{% endif %}</span>
 </nav>
 {% endif %}
 {% else %}

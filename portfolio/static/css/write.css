@@ -28,7 +28,7 @@
 }
 .ed-byline a { color: var(--muted); font-weight: 400; text-decoration: none; }
 
-.ed-body-wrap { position: relative; margin-top: 22px; }
+.ed-body-wrap { position: relative; padding-top: 22px; } /* padding, not margin: the gap is clickable */
 
 /* Quill reset: let .prose do the typography */
 .ed-body.ql-container { font: inherit; height: auto; }
@@ -198,3 +198,7 @@
 .ed-danger:hover { color: #dc2626; }
 .ed-status { color: var(--muted); font-size: 15px; }
 .ed-status.error { color: #dc2626; }
+
+/* Long URLs wrap while writing too */
+.ed-body .ql-editor { overflow-wrap: break-word; }
+.ed-body .ql-editor a { overflow-wrap: anywhere; }

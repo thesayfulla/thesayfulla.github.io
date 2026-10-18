@@ -1,27 +1,40 @@
-from django.contrib import messages
-from django.contrib.auth.decorators import user_passes_test
-from django.shortcuts import redirect, render
+from django.contrib.messages.views import SuccessMessageMixin
+from django.urls import reverse_lazy
+from django.views.generic import TemplateView, UpdateView
 
 from blog.models import Post
+from portfolio.mixins import StaffRequiredMixin
 
+from . import cv
 from .forms import ProfileForm
 from .models import Profile
 
-staff_required = user_passes_test(lambda u: u.is_active and u.is_staff)
+
+class HomeView(TemplateView):
+    template_name = "home/home.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        count = Profile.load().latest_posts
+        context["latest_posts"] = Post.objects.all()[:count] if count else []
+        return context
 
 
-def home(request):
-    profile = Profile.load()
-    posts = Post.objects.all()[: profile.latest_posts] if profile.latest_posts else []
-    return render(request, "home/home.html", {"latest_posts": posts})
+class CVView(TemplateView):
+    template_name = "home/cv.html"
+    extra_context = {"cv": cv}
 
 
-@staff_required
-def settings_view(request):
-    profile = Profile.load()
-    form = ProfileForm(request.POST or None, request.FILES or None, instance=profile)
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Saved.")
-        return redirect("settings")
-    return render(request, "home/settings.html", {"form": form})
+class SettingsView(StaffRequiredMixin, SuccessMessageMixin, UpdateView):
+    form_class = ProfileForm
+    template_name = "home/settings.html"
+    success_url = reverse_lazy("settings")
+    success_message = "Saved."
+
+    def get_object(self, queryset=None):
+        return Profile.load()
+
+    def get_context_object_name(self, obj):
+        # Don't shadow the site-wide `profile` (from the context processor) with
+        # the half-edited copy the form holds when a save fails validation.
+        return None

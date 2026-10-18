@@ -108,9 +108,81 @@
   Quill.register(FigureBlot);
   Quill.register(EmbedBlot);
 
+  // ---------- Getting out of blocks ----------
+  // Code blocks, images and embeds can sit at the very top or bottom of a post
+  // (or right next to each other) with no text line around them. These helpers
+  // open an empty paragraph above/below such a block so you can keep writing.
+  const Delta = Quill.import("delta");
+  const BLOCK_TOPS = new Set(["code-block-container", "figure", "embed"]);
+
+  const topOf = (line) => (line && line.statics.blotName === "code-block" ? line.parent : line);
+  const isBlock = (top) => !!top && BLOCK_TOPS.has(top.statics.blotName);
+
+  function openLineAt(index) {
+    quill.updateContents(new Delta().retain(index).insert("\n"), "user");
+    quill.setSelection(index, 0, "user");
+  }
+  function openLineAbove(top) { openLineAt(quill.getIndex(top)); }
+  function openLineBelow(top) {
+    const end = quill.getIndex(top) + top.length();
+    if (end >= quill.getLength()) {
+      quill.insertText(quill.getLength(), "\n", "user");
+      quill.formatLine(quill.getLength() - 1, 1, { "code-block": false }, "user");
+      quill.setSelection(quill.getLength() - 1, 0, "user");
+    } else {
+      openLineAt(end);
+    }
+  }
+
+  // Is `line` the first (or last) line of a block with nothing writable before (after) it?
+  function stuckAbove(line) {
+    const top = topOf(line);
+    if (!isBlock(top)) return null;
+    if (line.statics.blotName === "code-block" && line.prev) return null;
+    return !top.prev || isBlock(top.prev) ? top : null;
+  }
+  function stuckBelow(line) {
+    const top = topOf(line);
+    if (!isBlock(top)) return null;
+    if (line.statics.blotName === "code-block" && line.next) return null;
+    return !top.next || isBlock(top.next) ? top : null;
+  }
+
   // ---------- Markdown-style shortcuts ----------
   const inCode = (ctx) => !!ctx.format["code-block"];
   const bindings = {
+    escapeUp: {
+      key: "ArrowUp",
+      collapsed: true,
+      handler(range, ctx) {
+        const top = stuckAbove(ctx.line);
+        if (!top) return true;
+        openLineAbove(top);
+        return false;
+      },
+    },
+    escapeDown: {
+      key: "ArrowDown",
+      collapsed: true,
+      handler(range, ctx) {
+        const top = stuckBelow(ctx.line);
+        if (!top) return true;
+        openLineBelow(top);
+        return false;
+      },
+    },
+    codeTopEnter: {
+      key: "Enter",
+      collapsed: true,
+      offset: 0,
+      format: ["code-block"],
+      handler(range, ctx) {
+        const top = stuckAbove(ctx.line);
+        if (!top) return true;
+        openLineAbove(top);
+        return false;
+      },
+    },
     mdHeading: {
       key: " ",
       collapsed: true,
@@ -248,8 +320,33 @@
   titleEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || (e.key === "ArrowDown" && titleEl.selectionStart === titleEl.value.length)) {
       e.preventDefault();
-      quill.setSelection(0, 0, "user");
+      goToStart();
     }
+  });
+
+  function goToStart() {
+    const [first] = quill.getLine(0);
+    const top = stuckAbove(first);
+    if (top) openLineAbove(top);
+    else quill.setSelection(0, 0, "user");
+  }
+
+  // Clicking the gap under the date, or the empty space under the last block.
+  bodyWrap.addEventListener("mousedown", (e) => {
+    if (e.target !== bodyWrap) return;
+    if (e.clientY < quill.root.getBoundingClientRect().top) {
+      e.preventDefault();
+      goToStart();
+    }
+  });
+  quill.root.addEventListener("mousedown", (e) => {
+    if (e.target !== quill.root) return;
+    const last = quill.root.lastElementChild;
+    if (!last || e.clientY <= last.getBoundingClientRect().bottom) return;
+    const top = stuckBelow(quill.getLines().pop());
+    if (!top) return;
+    e.preventDefault();
+    openLineBelow(top);
   });
   quill.on("text-change", (_d, _o, source) => { if (source === "user") changed(); });
   window.addEventListener("beforeunload", (e) => { if (dirty && initial.id) e.preventDefault(); });
