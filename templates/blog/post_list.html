@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Blog · {{ profile.name }}{% endblock %}
+{% block body_class %}template-blog-index{% endblock %}
+
+{% block content %}
+<div class="article-head">
+    <h1>Blog</h1>
+</div>
+
+{% if posts %}
+<ul class="post-list" style="margin-top: 24px">
+    {% for post in posts %}
+    <li class="with-summary">
+        <span>
+            <a href="{{ post.url }}">{{ post.title }}</a>
+            {% if post.excerpt %}<span class="summary">{{ post.excerpt }}</span>{% endif %}
+        </span>
+        <time datetime="{{ post.created_at|date('Y-m-d') }}">{{ post.created_at|date("M j, Y") }}</time>
+    </li>
+    {% endfor %}
+</ul>
+
+{% if is_paginated %}
+<nav class="pager">
+    <span>{% if page.has_previous %}{% if page.previous_page_number == 1 %}<a href="/blog/">← newer</a>{% else %}<a href="/blog/page/{{ page.previous_page_number }}/">← newer</a>{% endif %}{% endif %}</span>
+    <span>{% if page.has_next %}<a href="/blog/page/{{ page.next_page_number }}/">older →</a>{% endif %}</span>
+</nav>
+{% endif %}
+{% else %}
+<p class="empty">Nothing here yet — first article coming soon.{% if user.is_staff %} <a href="/write/">Write one →</a>{% endif %}</p>
+{% endif %}
+{% endblock %}

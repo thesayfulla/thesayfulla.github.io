@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+
+{% block title %}Settings · {{ profile.name }}{% endblock %}
+{% block body_class %}template-form{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.core.css">
+<link rel="stylesheet" href="{{ static('css/editor-kit.css') }}">
+{% endblock %}
+
+{% block content %}{% macro errorlist(error) %}{% if error %}<ul class="errorlist"><li>{{ error }}</li></ul>{% endif %}{% endmacro %}
+<form method="post" enctype="multipart/form-data" class="plain-form" id="settings-form">
+    {{ csrf_input }}
+    <h1>Settings</h1>
+    {% if messages %}{% for m in messages %}<p class="form-ok">{{ m }}</p>{% endfor %}{% endif %}
+    {% if form.errors %}<p class="form-error">Please fix the fields marked below.</p>{% endif %}
+
+    <fieldset>
+        <legend>You</legend>
+        <label>
+            <span>Header text</span>
+            <input type="text" name="handle" value="{{ form.handle }}" maxlength="60" required>
+            {{ errorlist(form.errors.handle) }}
+        </label>
+        <label>
+            <span>Full name <small>— used in browser tab titles</small></span>
+            <input type="text" name="name" value="{{ form.name }}" maxlength="100" required>
+            {{ errorlist(form.errors.name) }}
+        </label>
+        <div class="field">
+            <span>Bio <small>— select text to make it bold, italic or a link; hover a link to change it</small></span>
+            <div id="intro-editor" class="intro-editor prose"></div>
+            <input type="hidden" name="intro" id="intro-input" value="{{ form.intro }}">
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Links <small>— leave empty to hide</small></legend>
+        <label><span>X</span><input type="url" name="x_url" value="{{ form.x_url }}" placeholder="https://x.com/yourname">{{ errorlist(form.errors.x_url) }}</label>
+        <label><span>LinkedIn</span><input type="url" name="linkedin_url" value="{{ form.linkedin_url }}" placeholder="https://linkedin.com/in/yourname">{{ errorlist(form.errors.linkedin_url) }}</label>
+        <label><span>GitHub</span><input type="url" name="github_url" value="{{ form.github_url }}" placeholder="https://github.com/yourname">{{ errorlist(form.errors.github_url) }}</label>
+        <label><span>Email</span><input type="email" name="email" value="{{ form.email }}">{{ errorlist(form.errors.email) }}</label>
+    </fieldset>
+
+    <fieldset>
+        <legend>Home page</legend>
+        <div class="field">
+            <span>Hero video <small>— optional .mp4 or .webm, shown with the dot effect</small></span>
+            {% if profile.hero_video %}
+            <p class="current-file">Current: <a href="{{ profile.hero_video_url }}" target="_blank">{{ profile.hero_video|replace("hero/", "") }}</a>
+                <label class="inline"><input type="checkbox" name="remove_video"> remove</label></p>
+            {% endif %}
+            <input type="file" name="hero_video" accept="video/mp4,video/webm">
+            {{ errorlist(form.errors.hero_video) }}
+        </div>
+        <label>
+            <span>Recent posts to list <small>— 0 hides the list</small></span>
+            <input type="number" name="latest_posts" value="{{ form.latest_posts }}" min="0" max="50">
+            {{ errorlist(form.errors.latest_posts) }}
+        </label>
+    </fieldset>
+
+    <button type="submit" class="pill">Save</button>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script src="{{ static('js/editor-kit.js') }}"></script>
+<script>
+    (function () {
+        const input = document.getElementById("intro-input");
+        const quill = new Quill("#intro-editor", {
+            formats: ["bold", "italic", "link"],
+            modules: {
+                toolbar: false,
+                keyboard: { bindings: { link: { key: "k", shortKey: true, handler: () => { kit.openLink(); return false; } } } },
+            },
+        });
+        const kit = EditorKit.attach(quill, { buttons: ["bold", "italic", "link"] });
+        quill.clipboard.dangerouslyPasteHTML(input.value, "silent");
+        document.getElementById("settings-form").addEventListener("submit", () => {
+            input.value = quill.getLength() > 1 ? quill.getSemanticHTML() : "";
+        });
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Page not found · {{ profile.name }}{% endblock %}
+
+{% block body_class %}template-404{% endblock %}
+
+{% block content %}
+<div class="article-head">
+    <h1>Page not found</h1>
+</div>
+<p>There's nothing at this address. Try the <a href="/">home page</a> or the <a href="/blog/">blog</a>.</p>
+{% endblock %}

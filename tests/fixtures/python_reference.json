@@ -1,0 +1,208 @@
+{
+ "render": [
+  {
+   "input": "<p>Hello <strong>world</strong> &amp; friends&nbsp;here</p>",
+   "output": "<p>Hello <strong>world</strong> &amp; friends here</p>"
+  },
+  {
+   "input": "<p><br></p><p>  </p><h3>Title</h3><p>Body <em>it</em> <u>u</u> <s>s</s></p><p><br></p>",
+   "output": "<h3>Title</h3><p>Body <em>it</em> <u>u</u> <s>s</s></p>"
+  },
+  {
+   "input": "<p title=\"t\" lang=\"en\" class=\"x\" onclick=\"evil()\">a<script>alert(1)</script><!-- c --></p><style>p{}</style>",
+   "output": "<p title=\"t\" lang=\"en\">a</p>"
+  },
+  {
+   "input": "<p><a href=\"javascript:alert(1)\">bad</a> <a href=\"https://ok.com/a?b=1&amp;c=2\">ok</a> <a href=\"mailto:x@y.z\">mail</a> <a href=\"/rel\">rel</a></p>",
+   "output": "<p><a rel=\"noopener noreferrer\">bad</a> <a href=\"https://ok.com/a?b=1&amp;c=2\" rel=\"noopener noreferrer\">ok</a> <a href=\"mailto:x@y.z\" rel=\"noopener noreferrer\">mail</a> <a href=\"/rel\" rel=\"noopener noreferrer\">rel</a></p>"
+  },
+  {
+   "input": "<figure><img src=\"/media/posts/2026/10/a.jpg\" alt=\"A &quot;pic&quot;\"><figcaption>Cap <strong>b</strong></figcaption></figure>",
+   "output": "<figure><img loading=\"lazy\" src=\"/media/posts/2026/10/a.jpg\" alt=\"A &quot;pic&quot;\"><figcaption>Cap <strong>b</strong></figcaption></figure>"
+  },
+  {
+   "input": "<blockquote>Quote</blockquote><ol><li>one</li><li>two</li></ol><ul><li>x</li></ul><h4>Sub</h4>",
+   "output": "<blockquote>Quote</blockquote><ol><li>one</li><li>two</li></ol><ul><li>x</li></ul><h4>Sub</h4>"
+  },
+  {
+   "input": "<div data-embed=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ&amp;t=10\"></div>",
+   "output": "<div class=\"embed video\"><iframe src=\"https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ\" allowfullscreen loading=\"lazy\" referrerpolicy=\"strict-origin-when-cross-origin\"></iframe></div>"
+  },
+  {
+   "input": "<div data-embed=\"https://youtu.be/dQw4w9WgXcQ?si=abc\"></div><div data-embed=\"https://m.youtube.com/shorts/abc123/\"></div>",
+   "output": "<div class=\"embed video\"><iframe src=\"https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ\" allowfullscreen loading=\"lazy\" referrerpolicy=\"strict-origin-when-cross-origin\"></iframe></div><div class=\"embed video\"><iframe src=\"https://www.youtube-nocookie.com/embed/abc123\" allowfullscreen loading=\"lazy\" referrerpolicy=\"strict-origin-when-cross-origin\"></iframe></div>"
+  },
+  {
+   "input": "<div data-embed=\"https://www.youtube.com/embed/xyz\"></div><div data-embed=\"https://youtube.com/live/LIVE1\"></div>",
+   "output": "<div class=\"embed video\"><iframe src=\"https://www.youtube-nocookie.com/embed/xyz\" allowfullscreen loading=\"lazy\" referrerpolicy=\"strict-origin-when-cross-origin\"></iframe></div><div class=\"embed video\"><iframe src=\"https://www.youtube-nocookie.com/embed/LIVE1\" allowfullscreen loading=\"lazy\" referrerpolicy=\"strict-origin-when-cross-origin\"></iframe></div>"
+  },
+  {
+   "input": "<div data-embed=\"https://vimeo.com/123456789\"></div><div data-embed=\"https://player.vimeo.com/video/987\"></div>",
+   "output": "<div class=\"embed video\"><iframe src=\"https://player.vimeo.com/video/123456789\" allowfullscreen loading=\"lazy\" referrerpolicy=\"strict-origin-when-cross-origin\"></iframe></div><div class=\"embed video\"><iframe src=\"https://player.vimeo.com/video/987\" allowfullscreen loading=\"lazy\" referrerpolicy=\"strict-origin-when-cross-origin\"></iframe></div>"
+  },
+  {
+   "input": "<div data-embed=\"https://gist.github.com/someone/0123abcd/\"></div>",
+   "output": "<div class=\"gist-embed\"><script src=\"https://gist.github.com/someone/0123abcd.js\"></script></div>"
+  },
+  {
+   "input": "<div data-embed=\"https://x.com/jack/status/20?s=1\"></div><div data-embed=\"https://twitter.com/jack/status/20\"></div><div data-embed=\"https://www.x.com/jack/status/21\"></div>",
+   "output": "<div class=\"embed tweet\"><blockquote class=\"twitter-tweet\" data-dnt=\"true\"><a href=\"https://twitter.com/jack/status/20?s=1\">https://x.com/jack/status/20?s=1</a></blockquote><script async src=\"https://platform.twitter.com/widgets.js\"></script></div><div class=\"embed tweet\"><blockquote class=\"twitter-tweet\" data-dnt=\"true\"><a href=\"https://twitter.com/jack/status/20\">https://twitter.com/jack/status/20</a></blockquote><script async src=\"https://platform.twitter.com/widgets.js\"></script></div><div class=\"embed tweet\"><blockquote class=\"twitter-tweet\" data-dnt=\"true\"><a href=\"https://twitter.com/jack/status/21\">https://www.x.com/jack/status/21</a></blockquote><script async src=\"https://platform.twitter.com/widgets.js\"></script></div>"
+  },
+  {
+   "input": "<div data-embed=\"https://example.com/a&quot;b<c>\"></div><div data-embed=\"not a url\"></div>",
+   "output": "<p class=\"embed-link\"><a href=\"https://example.com/a&quot;b&lt;c&gt;\" target=\"_blank\" rel=\"noopener noreferrer\">https://example.com/a&quot;b&lt;c&gt;</a></p><p class=\"embed-link\"><a href=\"not a url\" target=\"_blank\" rel=\"noopener noreferrer\">not a url</a></p>"
+  },
+  {
+   "input": "<pre data-language=\"plain\">a &lt; b &amp;&amp; c\n\n</pre><pre data-language=\"\">\n\n</pre><pre data-language=\"nosuchlang\">x = \"1\"</pre>",
+   "output": "<div class=\"codeblock\"><div class=\"codeblock-bar\"><span></span><button type=\"button\" class=\"codeblock-copy\">copy</button></div><div class=\"highlight\"><pre><span></span>a &lt; b &amp;&amp; c\n</pre></div>\n</div><div class=\"codeblock\"><div class=\"codeblock-bar\"><span></span><button type=\"button\" class=\"codeblock-copy\">copy</button></div><div class=\"highlight\"><pre><span></span>x = \"1\"\n</pre></div>\n</div>"
+  },
+  {
+   "input": "<pre data-language=\"plain\">line1\n  line2 'q' \"dq\"</pre><p>after</p>",
+   "output": "<div class=\"codeblock\"><div class=\"codeblock-bar\"><span></span><button type=\"button\" class=\"codeblock-copy\">copy</button></div><div class=\"highlight\"><pre><span></span>line1\n  line2 'q' \"dq\"\n</pre></div>\n</div><p>after</p>"
+  },
+  {
+   "input": "<p>x</p><div class=\"evil\" data-embed=\"a\" data-x=\"1\">d</div><img src=\"x\" onerror=\"y\">",
+   "output": "<p>x</p><div data-embed=\"a\">d</div><img loading=\"lazy\" src=\"x\">"
+  },
+  {
+   "input": "<p>Unicode ’ “quotes” — dash … ellipsis ünïcödé</p><p></p>",
+   "output": "<p>Unicode ’ “quotes” — dash … ellipsis ünïcödé</p>"
+  }
+ ],
+ "split": [
+  {
+   "input": "<p>Hello <strong>world</strong> &amp; friends here</p>",
+   "prose": "Hello world & friends here",
+   "code": ""
+  },
+  {
+   "input": "<h3>Title</h3><p>Body <em>it</em> <u>u</u> <s>s</s></p>",
+   "prose": "Title Body it u s",
+   "code": ""
+  },
+  {
+   "input": "<figure><img loading=\"lazy\" src=\"/media/posts/2026/10/a.jpg\" alt=\"A &quot;pic&quot;\"><figcaption>Cap <strong>b</strong></figcaption></figure>",
+   "prose": "",
+   "code": ""
+  },
+  {
+   "input": "<blockquote>Quote</blockquote><ol><li>one</li><li>two</li></ol><ul><li>x</li></ul><h4>Sub</h4>",
+   "prose": "Quote one two x Sub",
+   "code": ""
+  },
+  {
+   "input": "<div class=\"codeblock\"><div class=\"codeblock-bar\"><span></span><button type=\"button\" class=\"codeblock-copy\">copy</button></div><div class=\"highlight\"><pre><span></span>a &lt; b &amp;&amp; c\n</pre></div>\n</div><div class=\"codeblock\"><div class=\"codeblock-bar\"><span></span><button type=\"button\" class=\"codeblock-copy\">copy</button></div><div class=\"highlight\"><pre><span></span>x = \"1\"\n</pre></div>\n</div>",
+   "prose": "",
+   "code": "a < b && c x = \"1\""
+  },
+  {
+   "input": "<div class=\"codeblock\"><div class=\"codeblock-bar\"><span></span><button type=\"button\" class=\"codeblock-copy\">copy</button></div><div class=\"highlight\"><pre><span></span>line1\n  line2 'q' \"dq\"\n</pre></div>\n</div><p>after</p>",
+   "prose": "after",
+   "code": "line1 line2 'q' \"dq\""
+  },
+  {
+   "input": "<p class=\"embed-link\"><a href=\"https://example.com/a&quot;b&lt;c&gt;\" target=\"_blank\" rel=\"noopener noreferrer\">https://example.com/a&quot;b&lt;c&gt;</a></p><p class=\"embed-link\"><a href=\"not a url\" target=\"_blank\" rel=\"noopener noreferrer\">not a url</a></p>",
+   "prose": "",
+   "code": ""
+  },
+  {
+   "input": "<p>a<br/>b &amp; c &lt;tag&gt;</p><li>item <code>x</code></li><div><p>skipped</p></div><pre>code   here\nmore</pre>",
+   "prose": "a b & c <tag> item x",
+   "code": "code here more"
+  },
+  {
+   "input": "<p>unclosed <strong>bold</p><p>next</p><h3>head</h3></strong>",
+   "prose": "unclosed bold next head",
+   "code": ""
+  },
+  {
+   "input": "<p class=\"embed-link\"><a href=\"x\">link text</a></p><p>keep</p>",
+   "prose": "keep",
+   "code": ""
+  }
+ ],
+ "posts": [
+  {
+   "body_html": "<p>Hello <strong>world</strong> &amp; friends here</p>",
+   "excerpt": "Hello world & friends here",
+   "reading_minutes": 1
+  },
+  {
+   "body_html": "<div class=\"codeblock\"><div class=\"codeblock-bar\"><span></span><button type=\"button\" class=\"codeblock-copy\">copy</button></div><div class=\"highlight\"><pre><span></span>line1\n  line2 'q' \"dq\"\n</pre></div>\n</div><p>after</p>",
+   "excerpt": "after",
+   "reading_minutes": 1
+  },
+  {
+   "body_html": "<p>word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word </p>",
+   "excerpt": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word…",
+   "reading_minutes": 3
+  },
+  {
+   "body_html": "<p>lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor </p>",
+   "excerpt": "lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum…",
+   "reading_minutes": 1
+  },
+  {
+   "body_html": "<p>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</p>",
+   "excerpt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…",
+   "reading_minutes": 1
+  },
+  {
+   "body_html": "",
+   "excerpt": "",
+   "reading_minutes": 1
+  }
+ ],
+ "slugify": [
+  {
+   "input": "Hello World",
+   "output": "hello-world"
+  },
+  {
+   "input": "BTree va B+Tree",
+   "output": "btree-va-btree"
+  },
+  {
+   "input": "Database qulatmasdan index yaratish.",
+   "output": "database-qulatmasdan-index-yaratish"
+  },
+  {
+   "input": "Qabul qilishning 5 bosqichi",
+   "output": "qabul-qilishning-5-bosqichi"
+  },
+  {
+   "input": "  --Ünïcödé  ’quotes’ -- here__ ",
+   "output": "unicode-quotes-here"
+  },
+  {
+   "input": "C++ & C#",
+   "output": "c-c"
+  },
+  {
+   "input": "",
+   "output": ""
+  },
+  {
+   "input": "日本語",
+   "output": ""
+  },
+  {
+   "input": "a_b-c d\te",
+   "output": "a_b-c-d-e"
+  },
+  {
+   "input": "Ça va? Très bien!",
+   "output": "ca-va-tres-bien"
+  }
+ ],
+ "sanitize": [
+  {
+   "input": "<p>I&rsquo;m <a href=\"https://x.com\">x</a>&nbsp;y</p>",
+   "output": "<p>I’m <a href=\"https://x.com\" rel=\"noopener noreferrer\">x</a> y</p>"
+  },
+  {
+   "input": "<p><strong>b</strong><em>i</em><script>z</script></p>",
+   "output": "<p><strong>b</strong><em>i</em></p>"
+  }
+ ]
+}

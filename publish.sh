@@ -4,8 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-.venv/bin/python manage.py backup      # db + media -> ~/Documents/Portfolio Backups
-.venv/bin/python manage.py build_site
+cargo build --release --quiet
+./target/release/portfolio backup      # db + media -> ~/Documents/Portfolio Backups
+./target/release/portfolio build-site
 
 git add -A docs
 if git diff --cached --quiet -- docs; then
