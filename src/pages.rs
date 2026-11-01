@@ -85,7 +85,7 @@ impl Site {
     }
 
     fn render(&self, template: &str, viewer: &Viewer, extra: Value) -> Result<String> {
-        let profile = Profile::load(&self.db.conn())?;
+        let profile = Profile::load(&mut self.db.conn())?;
         let csrf_input = format!(
             r#"<input type="hidden" name="csrfmiddlewaretoken" value="{}">"#,
             escape(&viewer.csrf_token)
@@ -101,9 +101,9 @@ impl Site {
 
     pub fn home(&self, viewer: &Viewer) -> Result<String> {
         let posts = {
-            let conn = self.db.conn();
-            let count = Profile::load(&conn)?.latest_posts;
-            if count > 0 { Post::list(&conn, count, 0)? } else { vec![] }
+            let mut conn = self.db.conn();
+            let count = Profile::load(&mut conn)?.latest_posts;
+            if count > 0 { Post::list(&mut conn, count, 0)? } else { vec![] }
         };
         let posts: Vec<_> = posts.iter().map(Post::view).collect();
         self.render("home/home.html", viewer, context! { latest_posts => Serde(posts) })
@@ -114,7 +114,7 @@ impl Site {
     }
 
     pub fn page_count(&self) -> Result<i64> {
-        let count = Post::count(&self.db.conn())?;
+        let count = Post::count(&mut self.db.conn())?;
         Ok(((count + POSTS_PER_PAGE - 1) / POSTS_PER_PAGE).max(1))
     }
 
@@ -124,7 +124,7 @@ impl Site {
         if page < 1 || page > pages {
             return Ok(None);
         }
-        let posts = Post::list(&self.db.conn(), POSTS_PER_PAGE, (page - 1) * POSTS_PER_PAGE)?;
+        let posts = Post::list(&mut self.db.conn(), POSTS_PER_PAGE, (page - 1) * POSTS_PER_PAGE)?;
         let posts: Vec<_> = posts.iter().map(Post::view).collect();
         let ctx = context! {
             posts => Serde(posts),
@@ -141,7 +141,7 @@ impl Site {
 
     /// None if there is no such post.
     pub fn post_detail(&self, viewer: &Viewer, slug: &str) -> Result<Option<String>> {
-        let Some(post) = Post::by_slug(&self.db.conn(), slug)? else {
+        let Some(post) = Post::by_slug(&mut self.db.conn(), slug)? else {
             return Ok(None);
         };
         self.render("blog/post_detail.html", viewer, context! { post => Serde(post.view()) }).map(Some)

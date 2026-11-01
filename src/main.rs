@@ -56,10 +56,11 @@ enum Command {
         dest: Option<PathBuf>,
     },
     /// Create a staff user who can log in, write and change settings.
+    /// Asks for anything not given on the command line.
     CreateUser {
-        username: String,
-        #[arg(long, default_value = "")]
-        email: String,
+        username: Option<String>,
+        #[arg(long)]
+        email: Option<String>,
     },
     /// Set a new password for a user.
     ChangePassword { username: String },
@@ -79,7 +80,7 @@ async fn run(cli: Cli) -> Result<()> {
         Command::Serve { host, port } => web::serve(config, &host, port).await,
         Command::BuildSite { out } => build_site::run(&config, &out),
         Command::Backup { dest } => backup::run(&config, dest),
-        Command::CreateUser { username, email } => auth::create_user_cli(&config, &username, &email),
+        Command::CreateUser { username, email } => auth::create_user_cli(&config, username, email),
         Command::ChangePassword { username } => auth::change_password_cli(&config, &username),
     }
 }

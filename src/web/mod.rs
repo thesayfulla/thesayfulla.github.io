@@ -156,7 +156,7 @@ impl FromRequestParts<AppState> for Viewer {
         let csrf = parts.extensions.get::<Csrf>().cloned().unwrap_or(Csrf { token: String::new(), from_cookie: false });
         let session_key = cookie(&parts.headers, SESSION_COOKIE).filter(|k| !k.is_empty());
         let user = match &session_key {
-            Some(key) => User::by_session(&site.db.conn(), key)?,
+            Some(key) => User::by_session(&mut site.db.conn(), key)?,
             None => None,
         };
         Ok(Viewer { user, session_key, csrf_token: csrf.token, csrf_from_cookie: csrf.from_cookie })

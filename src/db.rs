@@ -6,11 +6,20 @@ use std::sync::{Mutex, MutexGuard};
 
 use anyhow::{Context, Result};
 use chrono::{NaiveDateTime, Utc};
-use rusqlite::{Connection, OptionalExtension, Row, params};
+use diesel::connection::SimpleConnection;
+use diesel::deserialize::{self, FromSql, FromSqlRow};
+use diesel::dsl::exists;
+use diesel::expression::AsExpression;
+use diesel::prelude::*;
+use diesel::serialize::{self, IsNull, Output, ToSql};
+use diesel::sql_types::Text;
+use diesel::sqlite::{Sqlite, SqliteValue};
 use serde::Serialize;
 
 use crate::config::MEDIA_URL;
 use crate::rendering;
+
+pub type Conn = SqliteConnection;
 
 const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS "auth_user" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, "password" varchar(128) NOT NULL, "last_login" datetime NULL, "is_superuser" bool NOT NULL, "username" varchar(150) NOT NULL UNIQUE, "last_name" varchar(150) NOT NULL, "email" varchar(254) NOT NULL, "is_staff" bool NOT NULL, "is_active" bool NOT NULL, "date_joined" datetime NOT NULL, "first_name" varchar(150) NOT NULL);
@@ -21,19 +30,84 @@ CREATE TABLE IF NOT EXISTS "web_session" ("key" text NOT NULL PRIMARY KEY, "user
 CREATE INDEX IF NOT EXISTS "blog_post_created_at" ON "blog_post" ("created_at");
 "#;
 
+// Datetimes are Text: they hold Django's timestamp strings (see Ts below).
+diesel::table! {
+    auth_user (id) {
+        id -> BigInt,
+        password -> Text,
+        last_login -> Nullable<Text>,
+        is_superuser -> Bool,
+        username -> Text,
+        last_name -> Text,
+        email -> Text,
+        is_staff -> Bool,
+        is_active -> Bool,
+        date_joined -> Text,
+        first_name -> Text,
+    }
+}
+
+diesel::table! {
+    blog_post (id) {
+        id -> BigInt,
+        title -> Text,
+        slug -> Text,
+        body_delta -> Text,
+        body_html -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    blog_postimage (id) {
+        id -> BigInt,
+        file -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    home_profile (id) {
+        id -> BigInt,
+        handle -> Text,
+        name -> Text,
+        intro -> Text,
+        hero_video -> Text,
+        x_url -> Text,
+        linkedin_url -> Text,
+        github_url -> Text,
+        email -> Text,
+        latest_posts -> BigInt,
+    }
+}
+
+diesel::table! {
+    web_session (key) {
+        key -> Text,
+        user_id -> BigInt,
+        flash -> Nullable<Text>,
+        expires_at -> Text,
+    }
+}
+
+diesel::joinable!(web_session -> auth_user (user_id));
+diesel::allow_tables_to_appear_in_same_query!(auth_user, web_session);
+
 /// One connection behind a lock. Queries are tiny, so this is plenty for a personal site.
 /// Never hold the guard across an `.await` (the compiler enforces this in handlers).
-pub struct Db(Mutex<Connection>);
+pub struct Db(Mutex<Conn>);
 
 impl Db {
     pub fn open(path: &Path) -> Result<Self> {
-        let conn = Connection::open(path).with_context(|| format!("can't open the database at {}", path.display()))?;
-        conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;")?;
-        conn.execute_batch(SCHEMA).context("can't create the database tables")?;
+        let mut conn = Conn::establish(&path.to_string_lossy())
+            .with_context(|| format!("can't open the database at {}", path.display()))?;
+        conn.batch_execute("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;")?;
+        conn.batch_execute(SCHEMA).context("can't create the database tables")?;
         Ok(Self(Mutex::new(conn)))
     }
 
-    pub fn conn(&self) -> MutexGuard<'_, Connection> {
+    pub fn conn(&self) -> MutexGuard<'_, Conn> {
         self.0.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
@@ -55,6 +129,30 @@ fn parse_ts(s: &str) -> NaiveDateTime {
         .unwrap_or_default()
 }
 
+#[derive(Debug, AsExpression, FromSqlRow)]
+#[diesel(sql_type = Text)]
+pub struct Ts(NaiveDateTime);
+
+impl FromSql<Text, Sqlite> for Ts {
+    fn from_sql(value: SqliteValue<'_, '_, '_>) -> deserialize::Result<Self> {
+        let s: String = FromSql::<Text, Sqlite>::from_sql(value)?;
+        Ok(Ts(parse_ts(&s)))
+    }
+}
+
+impl ToSql<Text, Sqlite> for Ts {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Sqlite>) -> serialize::Result {
+        out.set_value(format_ts(&self.0));
+        Ok(IsNull::No)
+    }
+}
+
+impl From<Ts> for NaiveDateTime {
+    fn from(ts: Ts) -> Self {
+        ts.0
+    }
+}
+
 // ---------- Profile ----------
 
 pub const DEFAULT_INTRO: &str = "<p>I’m a software engineer currently building <a href=\"#\">Your Project</a>. \
@@ -64,7 +162,8 @@ engineer at <a href=\"#\">Company One</a> and <a href=\"#\">Company Two</a>.</p>
 — and I’ve been shipping things ever since.</p>";
 
 /// Everything about you shown on the site. There is only ever one row; edit it at /settings/.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Queryable, Selectable, Insertable, AsChangeset)]
+#[diesel(table_name = home_profile)]
 pub struct Profile {
     /// Shown at the top of every page.
     pub handle: String,
@@ -103,27 +202,8 @@ impl Profile {
     }
 
     /// The profile row, created with the defaults the first time.
-    pub fn load(conn: &Connection) -> Result<Self> {
-        let found = conn
-            .query_row(
-                "SELECT handle, name, intro, hero_video, x_url, linkedin_url, github_url, email, latest_posts
-                 FROM home_profile WHERE id = 1",
-                [],
-                |r| {
-                    Ok(Self {
-                        handle: r.get(0)?,
-                        name: r.get(1)?,
-                        intro: r.get(2)?,
-                        hero_video: r.get(3)?,
-                        x_url: r.get(4)?,
-                        linkedin_url: r.get(5)?,
-                        github_url: r.get(6)?,
-                        email: r.get(7)?,
-                        latest_posts: r.get(8)?,
-                    })
-                },
-            )
-            .optional()?;
+    pub fn load(conn: &mut Conn) -> Result<Self> {
+        let found = home_profile::table.find(1).select(Self::as_select()).first(conn).optional()?;
         match found {
             Some(profile) => Ok(profile),
             None => {
@@ -134,24 +214,21 @@ impl Profile {
         }
     }
 
-    pub fn save(&self, conn: &Connection) -> Result<()> {
-        conn.execute(
-            "INSERT INTO home_profile (id, handle, name, intro, hero_video, x_url, linkedin_url, github_url, email, latest_posts)
-             VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-             ON CONFLICT (id) DO UPDATE SET handle = ?1, name = ?2, intro = ?3, hero_video = ?4, x_url = ?5,
-                 linkedin_url = ?6, github_url = ?7, email = ?8, latest_posts = ?9",
-            params![
-                self.handle, self.name, self.intro, self.hero_video, self.x_url,
-                self.linkedin_url, self.github_url, self.email, self.latest_posts
-            ],
-        )?;
+    pub fn save(&self, conn: &mut Conn) -> Result<()> {
+        diesel::insert_into(home_profile::table)
+            .values((home_profile::id.eq(1), self))
+            .on_conflict(home_profile::id)
+            .do_update()
+            .set(self)
+            .execute(conn)?;
         Ok(())
     }
 }
 
 // ---------- Posts ----------
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Queryable, Selectable)]
+#[diesel(table_name = blog_post)]
 pub struct Post {
     pub id: i64,
     pub title: String,
@@ -160,7 +237,9 @@ pub struct Post {
     pub body_delta: String,
     /// The rendered article HTML (what visitors see).
     pub body_html: String,
+    #[diesel(deserialize_as = Ts)]
     pub created_at: NaiveDateTime,
+    #[diesel(deserialize_as = Ts)]
     pub updated_at: NaiveDateTime,
 }
 
@@ -176,21 +255,7 @@ pub struct PostView {
     pub reading_minutes: u64,
 }
 
-const POST_COLUMNS: &str = "id, title, slug, body_delta, body_html, created_at, updated_at";
-
 impl Post {
-    fn from_row(r: &Row) -> rusqlite::Result<Self> {
-        Ok(Self {
-            id: r.get(0)?,
-            title: r.get(1)?,
-            slug: r.get(2)?,
-            body_delta: r.get(3)?,
-            body_html: r.get(4)?,
-            created_at: parse_ts(&r.get::<_, String>(5)?),
-            updated_at: parse_ts(&r.get::<_, String>(6)?),
-        })
-    }
-
     pub fn url(&self) -> String {
         format!("/blog/{}/", self.slug)
     }
@@ -224,78 +289,81 @@ impl Post {
         }
     }
 
-    /// Newest first.
-    pub fn list(conn: &Connection, limit: i64, offset: i64) -> Result<Vec<Self>> {
-        let mut stmt = conn.prepare_cached(&format!(
-            "SELECT {POST_COLUMNS} FROM blog_post ORDER BY created_at DESC, id DESC LIMIT ?1 OFFSET ?2"
-        ))?;
-        let rows = stmt.query_map(params![limit, offset], Self::from_row)?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    /// Newest first. A limit of -1 means all of them.
+    pub fn list(conn: &mut Conn, limit: i64, offset: i64) -> Result<Vec<Self>> {
+        use self::blog_post::dsl::*;
+        Ok(blog_post
+            .order((created_at.desc(), id.desc()))
+            .limit(limit)
+            .offset(offset)
+            .select(Self::as_select())
+            .load(conn)?)
     }
 
-    pub fn all(conn: &Connection) -> Result<Vec<Self>> {
+    pub fn all(conn: &mut Conn) -> Result<Vec<Self>> {
         Self::list(conn, -1, 0)
     }
 
-    pub fn count(conn: &Connection) -> Result<i64> {
-        Ok(conn.query_row("SELECT COUNT(*) FROM blog_post", [], |r| r.get(0))?)
+    pub fn count(conn: &mut Conn) -> Result<i64> {
+        Ok(blog_post::table.count().get_result(conn)?)
     }
 
-    pub fn by_id(conn: &Connection, id: i64) -> Result<Option<Self>> {
-        let sql = format!("SELECT {POST_COLUMNS} FROM blog_post WHERE id = ?1");
-        Ok(conn.query_row(&sql, [id], Self::from_row).optional()?)
+    pub fn by_id(conn: &mut Conn, id: i64) -> Result<Option<Self>> {
+        Ok(blog_post::table.find(id).select(Self::as_select()).first(conn).optional()?)
     }
 
-    pub fn by_slug(conn: &Connection, slug: &str) -> Result<Option<Self>> {
-        let sql = format!("SELECT {POST_COLUMNS} FROM blog_post WHERE slug = ?1");
-        Ok(conn.query_row(&sql, [slug], Self::from_row).optional()?)
+    pub fn by_slug(conn: &mut Conn, slug: &str) -> Result<Option<Self>> {
+        Ok(blog_post::table
+            .filter(blog_post::slug.eq(slug))
+            .select(Self::as_select())
+            .first(conn)
+            .optional()?)
     }
 
-    pub fn slug_taken(conn: &Connection, slug: &str, exclude_id: Option<i64>) -> Result<bool> {
-        Ok(conn.query_row(
-            "SELECT EXISTS (SELECT 1 FROM blog_post WHERE slug = ?1 AND id IS NOT ?2)",
-            params![slug, exclude_id],
-            |r| r.get(0),
-        )?)
+    pub fn slug_taken(conn: &mut Conn, slug: &str, exclude_id: Option<i64>) -> Result<bool> {
+        // ids start at 1, so 0 excludes nothing.
+        let others = blog_post::table
+            .filter(blog_post::slug.eq(slug))
+            .filter(blog_post::id.ne(exclude_id.unwrap_or(0)));
+        Ok(diesel::select(exists(others)).get_result(conn)?)
     }
 
     /// Insert (id 0) or update. Sets the timestamps.
-    pub fn save(&mut self, conn: &Connection) -> Result<()> {
+    pub fn save(&mut self, conn: &mut Conn) -> Result<()> {
+        use self::blog_post::dsl::*;
         self.updated_at = now();
+        let fields = (
+            title.eq(&self.title),
+            slug.eq(&self.slug),
+            body_delta.eq(&self.body_delta),
+            body_html.eq(&self.body_html),
+            updated_at.eq(Ts(self.updated_at)),
+        );
         if self.id == 0 {
             self.created_at = self.updated_at;
-            conn.execute(
-                "INSERT INTO blog_post (title, slug, body_delta, body_html, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    self.title, self.slug, self.body_delta, self.body_html,
-                    format_ts(&self.created_at), format_ts(&self.updated_at)
-                ],
-            )?;
-            self.id = conn.last_insert_rowid();
+            self.id = diesel::insert_into(blog_post)
+                .values((fields, created_at.eq(Ts(self.created_at))))
+                .returning(id)
+                .get_result(conn)?;
         } else {
-            conn.execute(
-                "UPDATE blog_post SET title = ?1, slug = ?2, body_delta = ?3, body_html = ?4, updated_at = ?5
-                 WHERE id = ?6",
-                params![self.title, self.slug, self.body_delta, self.body_html, format_ts(&self.updated_at), self.id],
-            )?;
+            diesel::update(blog_post.find(self.id)).set(fields).execute(conn)?;
         }
         Ok(())
     }
 
-    pub fn delete(conn: &Connection, id: i64) -> Result<bool> {
-        Ok(conn.execute("DELETE FROM blog_post WHERE id = ?1", [id])? > 0)
+    pub fn delete(conn: &mut Conn, id: i64) -> Result<bool> {
+        Ok(diesel::delete(blog_post::table.find(id)).execute(conn)? > 0)
     }
 }
 
 /// An image uploaded from the editor. Kept even if removed from a post, so old links don't break.
 /// Returns the new row's id.
-pub fn insert_post_image(conn: &Connection, file: &str) -> Result<i64> {
-    conn.execute(
-        "INSERT INTO blog_postimage (file, created_at) VALUES (?1, ?2)",
-        params![file, format_ts(&now())],
-    )?;
-    Ok(conn.last_insert_rowid())
+pub fn insert_post_image(conn: &mut Conn, file: &str) -> Result<i64> {
+    use blog_postimage::dsl;
+    Ok(diesel::insert_into(dsl::blog_postimage)
+        .values((dsl::file.eq(file), dsl::created_at.eq(Ts(now()))))
+        .returning(dsl::id)
+        .get_result(conn)?)
 }
 
 pub fn media_url(name: &str) -> String {
@@ -304,7 +372,8 @@ pub fn media_url(name: &str) -> String {
 
 // ---------- Users and sessions ----------
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Queryable, Selectable)]
+#[diesel(table_name = auth_user)]
 pub struct User {
     pub id: i64,
     pub password: String,
@@ -313,87 +382,137 @@ pub struct User {
 }
 
 impl User {
-    fn from_row(r: &Row) -> rusqlite::Result<Self> {
-        Ok(Self {
-            id: r.get(0)?,
-            password: r.get(1)?,
-            is_staff: r.get(2)?,
-            is_active: r.get(3)?,
-        })
-    }
-
-    pub fn by_username(conn: &Connection, username: &str) -> Result<Option<Self>> {
-        Ok(conn
-            .query_row(
-                "SELECT id, password, is_staff, is_active FROM auth_user WHERE username = ?1",
-                [username],
-                Self::from_row,
-            )
+    pub fn by_username(conn: &mut Conn, username: &str) -> Result<Option<Self>> {
+        Ok(auth_user::table
+            .filter(auth_user::username.eq(username))
+            .select(Self::as_select())
+            .first(conn)
             .optional()?)
     }
 
     /// The active user behind a live session, if any.
-    pub fn by_session(conn: &Connection, key: &str) -> Result<Option<Self>> {
-        Ok(conn
-            .query_row(
-                "SELECT u.id, u.password, u.is_staff, u.is_active
-                 FROM web_session s JOIN auth_user u ON u.id = s.user_id
-                 WHERE s.key = ?1 AND s.expires_at > ?2 AND u.is_active",
-                params![key, format_ts(&now())],
-                Self::from_row,
-            )
+    pub fn by_session(conn: &mut Conn, key: &str) -> Result<Option<Self>> {
+        Ok(web_session::table
+            .inner_join(auth_user::table)
+            .filter(web_session::key.eq(key))
+            .filter(web_session::expires_at.gt(Ts(now())))
+            .filter(auth_user::is_active.eq(true))
+            .select(Self::as_select())
+            .first(conn)
             .optional()?)
     }
 
-    pub fn create(conn: &Connection, username: &str, email: &str, password_hash: &str) -> Result<()> {
-        conn.execute(
-            "INSERT INTO auth_user (password, is_superuser, username, first_name, last_name, email, is_staff, is_active, date_joined)
-             VALUES (?1, 1, ?2, '', '', ?3, 1, 1, ?4)",
-            params![password_hash, username, email, format_ts(&now())],
-        )?;
+    pub fn create(conn: &mut Conn, name: &str, mail: &str, password_hash: &str) -> Result<()> {
+        use self::auth_user::dsl::*;
+        diesel::insert_into(auth_user)
+            .values((
+                password.eq(password_hash),
+                is_superuser.eq(true),
+                username.eq(name),
+                first_name.eq(""),
+                last_name.eq(""),
+                email.eq(mail),
+                is_staff.eq(true),
+                is_active.eq(true),
+                date_joined.eq(Ts(now())),
+            ))
+            .execute(conn)?;
         Ok(())
     }
 
-    pub fn set_password(conn: &Connection, id: i64, password_hash: &str) -> Result<()> {
-        conn.execute("UPDATE auth_user SET password = ?1 WHERE id = ?2", params![password_hash, id])?;
+    pub fn set_password(conn: &mut Conn, id: i64, password_hash: &str) -> Result<()> {
+        diesel::update(auth_user::table.find(id)).set(auth_user::password.eq(password_hash)).execute(conn)?;
         // Log out everywhere.
-        conn.execute("DELETE FROM web_session WHERE user_id = ?1", [id])?;
+        diesel::delete(web_session::table.filter(web_session::user_id.eq(id))).execute(conn)?;
         Ok(())
     }
 
-    pub fn touch_last_login(conn: &Connection, id: i64) -> Result<()> {
-        conn.execute("UPDATE auth_user SET last_login = ?1 WHERE id = ?2", params![format_ts(&now()), id])?;
+    pub fn touch_last_login(conn: &mut Conn, id: i64) -> Result<()> {
+        diesel::update(auth_user::table.find(id)).set(auth_user::last_login.eq(Some(Ts(now())))).execute(conn)?;
         Ok(())
     }
 }
 
-pub fn create_session(conn: &Connection, key: &str, user_id: i64, expires_at: &NaiveDateTime) -> Result<()> {
-    conn.execute("DELETE FROM web_session WHERE expires_at <= ?1", [format_ts(&now())])?;
-    conn.execute(
-        "INSERT INTO web_session (key, user_id, expires_at) VALUES (?1, ?2, ?3)",
-        params![key, user_id, format_ts(expires_at)],
-    )?;
+pub fn create_session(conn: &mut Conn, key: &str, user_id: i64, expires_at: &NaiveDateTime) -> Result<()> {
+    diesel::delete(web_session::table.filter(web_session::expires_at.le(Ts(now())))).execute(conn)?;
+    diesel::insert_into(web_session::table)
+        .values((
+            web_session::key.eq(key),
+            web_session::user_id.eq(user_id),
+            web_session::expires_at.eq(Ts(*expires_at)),
+        ))
+        .execute(conn)?;
     Ok(())
 }
 
-pub fn delete_session(conn: &Connection, key: &str) -> Result<()> {
-    conn.execute("DELETE FROM web_session WHERE key = ?1", [key])?;
+pub fn delete_session(conn: &mut Conn, key: &str) -> Result<()> {
+    diesel::delete(web_session::table.find(key)).execute(conn)?;
     Ok(())
 }
 
 /// A one-time message shown on the next page ("Saved.").
-pub fn set_flash(conn: &Connection, key: &str, message: &str) -> Result<()> {
-    conn.execute("UPDATE web_session SET flash = ?1 WHERE key = ?2", params![message, key])?;
+pub fn set_flash(conn: &mut Conn, key: &str, message: &str) -> Result<()> {
+    diesel::update(web_session::table.find(key)).set(web_session::flash.eq(message)).execute(conn)?;
     Ok(())
 }
 
-pub fn take_flash(conn: &Connection, key: &str) -> Result<Option<String>> {
-    let flash: Option<Option<String>> = conn
-        .query_row("SELECT flash FROM web_session WHERE key = ?1", [key], |r| r.get(0))
-        .optional()?;
-    let flash = flash.flatten();
+pub fn take_flash(conn: &mut Conn, key: &str) -> Result<Option<String>> {
+    let flash: Option<String> = web_session::table
+        .find(key)
+        .select(web_session::flash)
+        .first(conn)
+        .optional()?
+        .flatten();
     if flash.is_some() {
-        conn.execute("UPDATE web_session SET flash = NULL WHERE key = ?1", [key])?;
+        diesel::update(web_session::table.find(key))
+            .set(web_session::flash.eq(None::<String>))
+            .execute(conn)?;
     }
     Ok(flash)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn post_save_and_load() {
+        let db = Db::open(Path::new(":memory:")).unwrap();
+        let conn = &mut db.conn();
+        let mut post = Post {
+            id: 0,
+            title: "Hello".into(),
+            slug: "hello".into(),
+            body_delta: "{}".into(),
+            body_html: "<p>hi</p>".into(),
+            created_at: now(),
+            updated_at: now(),
+        };
+        post.save(conn).unwrap();
+        post.title = "Hello again".into();
+        post.save(conn).unwrap();
+
+        let saved = Post::by_slug(conn, "hello").unwrap().unwrap();
+        assert_eq!(saved.title, "Hello again");
+        assert_eq!(format_ts(&saved.created_at), format_ts(&post.created_at));
+        assert!(Post::slug_taken(conn, "hello", None).unwrap());
+        assert!(!Post::slug_taken(conn, "hello", Some(post.id)).unwrap());
+    }
+
+    #[test]
+    fn sessions() {
+        let db = Db::open(Path::new(":memory:")).unwrap();
+        let conn = &mut db.conn();
+        User::create(conn, "me", "me@example.com", "hash").unwrap();
+        let me = User::by_username(conn, "me").unwrap().unwrap();
+        create_session(conn, "abc", me.id, &(now() + chrono::Duration::hours(1))).unwrap();
+        assert!(User::by_session(conn, "abc").unwrap().is_some());
+
+        set_flash(conn, "abc", "Saved.").unwrap();
+        assert_eq!(take_flash(conn, "abc").unwrap().as_deref(), Some("Saved."));
+        assert_eq!(take_flash(conn, "abc").unwrap(), None);
+
+        User::set_password(conn, me.id, "new").unwrap();
+        assert!(User::by_session(conn, "abc").unwrap().is_none());
+    }
 }

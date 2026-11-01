@@ -103,7 +103,7 @@ pub async fn login(
     let checker = site.clone();
     let name = username.clone();
     let user = tokio::task::spawn_blocking(move || -> anyhow::Result<Option<User>> {
-        let Some(user) = User::by_username(&checker.db.conn(), &name)? else {
+        let Some(user) = User::by_username(&mut checker.db.conn(), &name)? else {
             auth::waste_time(&password);
             return Ok(None);
         };
@@ -116,12 +116,12 @@ pub async fn login(
     };
     let key = random_string(32);
     {
-        let conn = site.db.conn();
+        let mut conn = site.db.conn();
         if let Some(old) = &viewer.session_key {
-            db::delete_session(&conn, old)?;
+            db::delete_session(&mut conn, old)?;
         }
-        db::create_session(&conn, &key, user.id, &(db::now() + Duration::seconds(SESSION_AGE_SECS)))?;
-        User::touch_last_login(&conn, user.id)?;
+        db::create_session(&mut conn, &key, user.id, &(db::now() + Duration::seconds(SESSION_AGE_SECS)))?;
+        User::touch_last_login(&mut conn, user.id)?;
     }
     let mut res = Redirect::to(next.as_deref().unwrap_or(LOGIN_REDIRECT_URL)).into_response();
     set_cookie(&mut res, SESSION_COOKIE, &key, SESSION_AGE_SECS, true);
@@ -138,7 +138,7 @@ pub async fn logout(
         return Ok(csrf_failed());
     }
     if let Some(key) = &viewer.session_key {
-        db::delete_session(&site.db.conn(), key)?;
+        db::delete_session(&mut site.db.conn(), key)?;
     }
     let mut res = Redirect::to("/").into_response();
     set_cookie(&mut res, SESSION_COOKIE, "", 0, true);
@@ -149,10 +149,10 @@ pub async fn logout(
 
 pub async fn settings_page(State(site): State<AppState>, Staff(viewer): Staff) -> WebResult {
     let (form, messages) = {
-        let conn = site.db.conn();
-        let form = ProfileForm::from_profile(&Profile::load(&conn)?);
+        let mut conn = site.db.conn();
+        let form = ProfileForm::from_profile(&Profile::load(&mut conn)?);
         let flash = match &viewer.session_key {
-            Some(key) => db::take_flash(&conn, key)?,
+            Some(key) => db::take_flash(&mut conn, key)?,
             None => None,
         };
         (form, flash.into_iter().collect::<Vec<_>>())
@@ -189,7 +189,7 @@ pub async fn settings_save(
         return Ok(csrf_failed());
     }
 
-    let (form, mut profile) = clean_profile_form(&fields, video.as_ref(), Profile::load(&site.db.conn())?);
+    let (form, mut profile) = clean_profile_form(&fields, video.as_ref(), Profile::load(&mut site.db.conn())?);
     if !form.errors.is_empty() {
         let html = site.settings(&viewer, &form, &[])?;
         return Ok((StatusCode::OK, Html(html)).into_response());
@@ -204,10 +204,10 @@ pub async fn settings_save(
         profile.hero_video.clear();
     }
 
-    let conn = site.db.conn();
-    profile.save(&conn)?;
+    let mut conn = site.db.conn();
+    profile.save(&mut conn)?;
     if let Some(key) = &viewer.session_key {
-        db::set_flash(&conn, key, "Saved.")?;
+        db::set_flash(&mut conn, key, "Saved.")?;
     }
     Ok(Redirect::to("/settings/").into_response())
 }

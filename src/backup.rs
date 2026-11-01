@@ -15,7 +15,8 @@ use std::io::{IsTerminal, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use rusqlite::Connection;
+use diesel::prelude::*;
+use diesel::sql_types::Text;
 use walkdir::WalkDir;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
@@ -52,9 +53,10 @@ pub fn run(config: &Config, dest: Option<PathBuf>) -> Result<()> {
     let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
     let target = dest.join(format!("portfolio-{stamp}.zip"));
 
-    // SQLite's backup API gives a consistent copy even while the server is running.
+    // VACUUM INTO writes a consistent copy even while the server is running.
     let snapshot = std::env::temp_dir().join(format!("portfolio-backup-{}.sqlite3", std::process::id()));
-    Connection::open(&config.db_path)?.backup(rusqlite::MAIN_DB, &snapshot, None)?;
+    let mut db = SqliteConnection::establish(&config.db_path.to_string_lossy())?;
+    diesel::sql_query("VACUUM INTO ?").bind::<Text, _>(snapshot.to_string_lossy()).execute(&mut db)?;
     let written = write_zip(&target, &snapshot, &config.media_root);
     let _ = std::fs::remove_file(&snapshot);
     let files = written?;

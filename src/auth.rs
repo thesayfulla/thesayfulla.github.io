@@ -3,6 +3,8 @@
 //! Hashes use Django's format (`pbkdf2_sha256$<rounds>$<salt>$<hash>`), so
 //! accounts made by the old Django version keep their passwords.
 
+use std::io::Write;
+
 use anyhow::{Context, Result, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -75,23 +77,44 @@ fn prompt_new_password(username: &str) -> Result<String> {
     }
 }
 
-pub fn create_user_cli(config: &Config, username: &str, email: &str) -> Result<()> {
+fn ask(question: &str) -> Result<String> {
+    print!("{question}");
+    std::io::stdout().flush()?;
+    let mut answer = String::new();
+    std::io::stdin().read_line(&mut answer)?;
+    Ok(answer.trim().to_string())
+}
+
+pub fn create_user_cli(config: &Config, username: Option<String>, email: Option<String>) -> Result<()> {
     let db = Db::open(&config.db_path)?;
-    if User::by_username(&db.conn(), username)?.is_some() {
+    let username = match username {
+        Some(name) => name,
+        None => loop {
+            let name = ask("Username: ")?;
+            if !name.is_empty() {
+                break name;
+            }
+        },
+    };
+    if User::by_username(&mut db.conn(), &username)?.is_some() {
         bail!("Username {username:?} is already taken.");
     }
-    let password = prompt_new_password(username)?;
-    User::create(&db.conn(), username, email, &hash_password(&password))?;
+    let email = match email {
+        Some(email) => email,
+        None => ask("Email (optional): ")?,
+    };
+    let password = prompt_new_password(&username)?;
+    User::create(&mut db.conn(), &username, &email, &hash_password(&password))?;
     println!("User {username:?} created. Log in at /login/.");
     Ok(())
 }
 
 pub fn change_password_cli(config: &Config, username: &str) -> Result<()> {
     let db = Db::open(&config.db_path)?;
-    let user = User::by_username(&db.conn(), username)?.with_context(|| format!("user {username:?} does not exist"))?;
+    let user = User::by_username(&mut db.conn(), username)?.with_context(|| format!("user {username:?} does not exist"))?;
     println!("Changing password for user {username:?}");
     let password = prompt_new_password(username)?;
-    User::set_password(&db.conn(), user.id, &hash_password(&password))?;
+    User::set_password(&mut db.conn(), user.id, &hash_password(&password))?;
     println!("Password changed successfully for user {username:?}");
     Ok(())
 }

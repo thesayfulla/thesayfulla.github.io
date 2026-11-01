@@ -1,6 +1,6 @@
 # sayfulla
 
-Personal site + blog. Rust (axum + minijinja + SQLite) — no CMS.
+Personal site + blog. Rust (axum + minijinja + Diesel on SQLite) — no CMS.
 
 ## Run locally
 
@@ -10,6 +10,8 @@ cargo run -- serve
 ```
 
 Site: http://localhost:8000 · Log in: http://localhost:8000/login/
+
+With [just](https://github.com/casey/just): `just run`, `just create-user`, `just build-site`, `just publish`.
 
 When logged in you get a **write** link in the header and **settings · log out** in the footer.
 Visitors see none of that. The database tables are created on first start.
@@ -54,7 +56,7 @@ Backs up the database and media, exports the public site into `docs/`
 - `src/pages.rs` — every page, shared by the server and the static export
 - `src/web/` — routes, login/settings (`handlers.rs`), the `/write/` editor and its uploads (`editor.rs`)
 - `src/rendering.rs` — editor HTML → article HTML; `src/highlight.rs` — code highlighting
-- `src/db.rs` — posts, profile, users, sessions (SQLite, same tables as the old Django version)
+- `src/db.rs` — posts, profile, users, sessions (Diesel ORM on SQLite, same tables as the old Django version)
 - `src/cv.rs` — résumé content for `/cv/`; edit it to update the page
 - `templates/` — Jinja templates; `base.html` has the header/footer on every page
 - `static/` — CSS, hero animation + theme toggle (`js/site.js`), editor (`js/write.js`, `css/write.css`)

@@ -32,7 +32,7 @@ pub async fn new_post(State(site): State<AppState>, Staff(viewer): Staff) -> Web
 
 pub async fn edit_post(State(site): State<AppState>, Staff(viewer): Staff, Path(id): Path<String>) -> WebResult {
     let post = match id.parse() {
-        Ok(id) => Post::by_id(&site.db.conn(), id)?,
+        Ok(id) => Post::by_id(&mut site.db.conn(), id)?,
         Err(_) => None,
     };
     match post {
@@ -47,7 +47,7 @@ fn security_failed() -> axum::response::Response {
     json_error(StatusCode::FORBIDDEN, "Security check failed. Reload the page and try again.")
 }
 
-fn unique_slug(conn: &rusqlite::Connection, title: &str, exclude_id: Option<i64>) -> Result<String> {
+fn unique_slug(conn: &mut db::Conn, title: &str, exclude_id: Option<i64>) -> Result<String> {
     let base = slugify(title);
     let base = match truncate_chars(&base, 70) {
         "" => "post",
@@ -94,12 +94,12 @@ pub async fn save(State(site): State<AppState>, StaffApi(viewer): StaffApi, head
     let body_html = render_article(html);
     let body_delta = get("delta").cloned().unwrap_or_else(|| json!({})).to_string();
 
-    let conn = site.db.conn();
+    let mut conn = site.db.conn();
     let mut post = match get("id") {
         Some(id) => {
             let id = id.as_i64().or_else(|| id.as_str().and_then(|s| s.trim().parse().ok()));
             // Keep the URL stable on edits.
-            match id.map(|id| Post::by_id(&conn, id)).transpose()?.flatten() {
+            match id.map(|id| Post::by_id(&mut conn, id)).transpose()?.flatten() {
                 Some(post) => post,
                 None => return Ok(json_error(StatusCode::NOT_FOUND, "That post doesn't exist any more.")),
             }
@@ -107,7 +107,7 @@ pub async fn save(State(site): State<AppState>, StaffApi(viewer): StaffApi, head
         None => Post {
             id: 0,
             title: String::new(),
-            slug: unique_slug(&conn, &title, None)?,
+            slug: unique_slug(&mut conn, &title, None)?,
             body_delta: String::new(),
             body_html: String::new(),
             created_at: db::now(),
@@ -117,7 +117,7 @@ pub async fn save(State(site): State<AppState>, StaffApi(viewer): StaffApi, head
     post.title = title;
     post.body_delta = body_delta;
     post.body_html = body_html;
-    post.save(&conn)?;
+    post.save(&mut conn)?;
     Ok(Json(json!({ "id": post.id, "url": post.url() })).into_response())
 }
 
@@ -155,7 +155,7 @@ pub async fn upload(
     let now = db::now();
     let dir = format!("posts/{}/{:02}", now.year(), now.month());
     let file = save_media(&site.config.media_root, &dir, &format!("{name}.{ext}"), &content)?;
-    let id = db::insert_post_image(&site.db.conn(), &file)?;
+    let id = db::insert_post_image(&mut site.db.conn(), &file)?;
     Ok(Json(json!({ "id": id, "url": db::media_url(&file) })).into_response())
 }
 
@@ -169,7 +169,7 @@ pub async fn delete(
         return Ok(security_failed());
     }
     let deleted = match id.parse() {
-        Ok(id) => Post::delete(&site.db.conn(), id)?,
+        Ok(id) => Post::delete(&mut site.db.conn(), id)?,
         Err(_) => false,
     };
     if !deleted {

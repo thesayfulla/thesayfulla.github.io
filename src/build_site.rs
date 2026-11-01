@@ -113,7 +113,7 @@ fn urls(site: &Site) -> Result<Vec<String>> {
     for n in 2..=site.page_count()? {
         urls.push(format!("/blog/page/{n}/"));
     }
-    urls.extend(Post::all(&site.db.conn())?.iter().map(Post::url));
+    urls.extend(Post::all(&mut site.db.conn())?.iter().map(Post::url));
     Ok(urls)
 }
 
